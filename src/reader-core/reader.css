@@ -2,29 +2,37 @@
  * glowficlog reader styles. EVERY selector is prefixed `glr-` so nothing leaks
  * into the host page and the host page cannot accidentally style the reader.
  * Tunables are CSS custom properties on `.glr-reader`.
+ *
+ * Colours come from the HOST page at runtime: the content script samples the
+ * live glowfic theme (readThemeFromDocument) and the harness samples a preset
+ * palette, both via applyTheme(), which sets --glr-bg/-fg/-link/-border and the
+ * derived --glr-muted/-sep/-chip-bg as inline custom properties on the reader
+ * root. The defaults below are only a fallback for when applyTheme is not
+ * called, so the reader still looks fine on its own.
  */
 
 .glr-reader {
-  /* tunables */
-  --glr-gutter: 64px;
-  --glr-icon-cap: 56px;        /* max icon edge for first-appearance posts */
-  --glr-icon-cap-repeat: 38px; /* smaller cap for condensed repeats */
-  --glr-col-max: 760px;
-  --glr-sep: 1px;
+  /* layout tunables */
+  --glr-col-max: 1100px;       /* text column max-width (Req 1: wide reading column) */
+  --glr-gutter: 112px;         /* each icon gutter ≈ icon cap (100px) + spacing */
+  --glr-gap: 14px;             /* column gap between gutter and text */
   --glr-row-pad: 6px;          /* minimal vertical padding per post */
-  --glr-gap: 10px;             /* column gap between gutter and text */
+  --glr-sep-width: 1px;        /* separator hairline thickness */
 
-  /* light theme palette (overridden by [data-theme="dark"]) */
+  /* icon flow-sizing tunables (read by layoutIcons) */
+  --glr-icon-min: 26px;        /* floor ≈ one line height: dense runs stay tiny */
+  --glr-icon-cap: 100px;       /* ceiling ≈ glowfic native max */
+  --glr-icon-gap: 8px;         /* clearance kept below an icon */
+
+  /* colour palette — fallback defaults; overridden inline by applyTheme and by
+     [data-theme="dark"] below. */
   --glr-bg: #ffffff;
   --glr-fg: #1b1b1f;
-  --glr-muted: #6b7280;
-  --glr-sep-color: #e5e7eb;
-  --glr-chip-bg: #eef2ff;
-  --glr-chip-fg: #3730a3;
-  --glr-accent: #2563eb;
-  --glr-ph-bg: #e5e7eb;
-  --glr-ph-fg: #6b7280;
-  --glr-pop-bg: #ffffff;
+  --glr-link: #2563eb;
+  --glr-border: #e5e7eb;
+  --glr-muted: rgba(27, 27, 31, 0.65);
+  --glr-sep: rgba(27, 27, 31, 0.12);
+  --glr-chip-bg: rgba(37, 99, 235, 0.16);
   --glr-pop-shadow: rgba(0, 0, 0, 0.25);
 
   box-sizing: border-box;
@@ -38,17 +46,15 @@
   line-height: 1.5;
 }
 
+/* Fallback dark palette for when applyTheme isn't driving the colours. */
 .glr-reader[data-theme="dark"] {
   --glr-bg: #16171b;
   --glr-fg: #e6e7ea;
-  --glr-muted: #9aa0aa;
-  --glr-sep-color: #2a2c33;
-  --glr-chip-bg: #26304d;
-  --glr-chip-fg: #c7d2fe;
-  --glr-accent: #7aa2ff;
-  --glr-ph-bg: #2a2c33;
-  --glr-ph-fg: #aab0ba;
-  --glr-pop-bg: #1f2127;
+  --glr-link: #7aa2ff;
+  --glr-border: #2a2c33;
+  --glr-muted: rgba(230, 231, 234, 0.65);
+  --glr-sep: rgba(230, 231, 234, 0.14);
+  --glr-chip-bg: rgba(122, 162, 255, 0.18);
   --glr-pop-shadow: rgba(0, 0, 0, 0.6);
 }
 
@@ -58,8 +64,10 @@
   box-sizing: border-box;
 }
 
-/* Continuous centred column. */
+/* Continuous centred column. `position: relative` makes it the offset parent
+   for icon cells, so layoutIcons can read each cell's offsetTop against it. */
 .glr-column {
+  position: relative;
   max-width: calc(var(--glr-col-max) + 2 * var(--glr-gutter) + 2 * var(--glr-gap));
   margin: 0 auto;
   padding: 0 12px;
@@ -75,7 +83,7 @@
 }
 
 .glr-post + .glr-post {
-  border-top: var(--glr-sep) solid var(--glr-sep-color);
+  border-top: var(--glr-sep-width) solid var(--glr-sep);
 }
 
 .glr-post--op {
@@ -83,7 +91,7 @@
 }
 
 .glr-post--op .glr-body {
-  border-left: 2px solid var(--glr-accent);
+  border-left: 2px solid var(--glr-link);
   padding-left: 10px;
 }
 
@@ -93,85 +101,79 @@
 .glr-post--right .glr-body { grid-column: 2; }
 .glr-post--right .glr-icon-cell { grid-column: 3; }
 
-/* Repeats get a smaller icon cap. */
-.glr-post--repeat { --glr-icon-cap: var(--glr-icon-cap-repeat); }
-
 /*
- * Height-fitting: the icon is absolutely positioned inside its (relatively
- * positioned, grid-stretched) cell, so it NEVER contributes to the row height.
- * The row height is therefore set by the text body alone, and the icon's
- * max-height resolves against that — `min(100%, cap)` makes a one-line post get
- * a tiny icon and a long post get a capped one.
+ * Icon flow-sizing. The cell is a relatively-positioned, grid-stretched anchor
+ * whose offsetTop layoutIcons measures. The square BOX is absolutely pinned to
+ * the cell's top edge, so it NEVER contributes to row height and is free to grow
+ * DOWNWARD past the message boundary into the adjacent (opposite-side, empty)
+ * gutter. layoutIcons writes its width/height; until it runs the box shows at
+ * the CSS min size.
  */
 .glr-icon-cell {
   position: relative;
-  min-height: 1.2em;
 }
 
-.glr-icon-wrap {
+.glr-icon-box {
   position: absolute;
-  top: 2px;
-  bottom: 2px;
-  left: 0;
-  right: 0;
-  display: flex;
-  align-items: flex-start;
+  top: 4px;
+  width: var(--glr-icon-min);
+  height: var(--glr-icon-min);
+  border-radius: 6px;
+  background: var(--glr-chip-bg);
+  z-index: 2;
+  container-type: size; /* lets the monogram glyph scale with the box */
 }
 
-.glr-post--left .glr-icon-wrap { justify-content: flex-end; }
-.glr-post--right .glr-icon-wrap { justify-content: flex-start; }
+/* Hug the text column: left-gutter icons align right, right-gutter icons left. */
+.glr-post--left .glr-icon-box { right: 0; }
+.glr-post--right .glr-icon-box { left: 0; }
 
 .glr-icon {
-  max-height: min(100%, var(--glr-icon-cap));
-  max-width: 100%;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  border-radius: 5px;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   display: block;
-  background: var(--glr-ph-bg);
+  border-radius: inherit;
 }
 
-/* Full-size hover/focus preview. */
+/* Monogram: iconless posts and the onerror fallback for broken/blocked icons. */
+.glr-icon-mono {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--glr-chip-bg);
+  color: var(--glr-fg);
+  font-weight: 700;
+  font-size: 48cqmin;
+  line-height: 1;
+  user-select: none;
+}
+
+/* Full-size hover/focus preview, escaping the (small) box. */
 .glr-icon-pop {
   position: absolute;
   top: 0;
   left: 50%;
   transform: translateX(-50%);
   display: none;
-  width: 100px;
+  width: 110px;
   max-width: none;
   height: auto;
   z-index: 50;
   padding: 4px;
   border-radius: 8px;
-  background: var(--glr-pop-bg);
+  background: var(--glr-bg);
   box-shadow: 0 6px 24px var(--glr-pop-shadow);
   pointer-events: none;
 }
 
-.glr-icon-wrap:hover .glr-icon-pop,
-.glr-icon-wrap:focus-within .glr-icon-pop {
+.glr-icon-box:hover .glr-icon-pop,
+.glr-icon-box:focus-within .glr-icon-pop {
   display: block;
 }
-
-/* Iconless placeholder: small, height-capped, never inflates the row. */
-.glr-icon-ph {
-  position: absolute;
-  top: 2px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--glr-ph-bg);
-  color: var(--glr-ph-fg);
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 20px;
-  text-align: center;
-}
-
-.glr-post--left .glr-icon-ph { right: 0; }
-.glr-post--right .glr-icon-ph { left: 0; }
 
 /* Text body. */
 .glr-body {
@@ -212,7 +214,7 @@
   padding: 0 7px;
   border-radius: 9px;
   background: var(--glr-chip-bg);
-  color: var(--glr-chip-fg);
+  color: var(--glr-link);
   font-size: 0.78em;
   font-weight: 600;
   line-height: 1.5;
@@ -232,7 +234,7 @@
 
 .glr-permalink:hover {
   opacity: 1;
-  color: var(--glr-accent);
+  color: var(--glr-link);
 }
 
 /* Compact post-content typography (minimise vertical padding). */
@@ -251,7 +253,7 @@
 .glr-content blockquote {
   margin: 0.4em 0;
   padding-left: 10px;
-  border-left: 3px solid var(--glr-sep-color);
+  border-left: 3px solid var(--glr-sep);
   color: var(--glr-muted);
 }
 
@@ -261,7 +263,7 @@
 }
 
 .glr-content a {
-  color: var(--glr-accent);
+  color: var(--glr-link);
 }
 
 /* ---- Host-page integration helpers (used by the content script) ---- */

@@ -3,3 +3,7 @@
 export type { Post, RenderOptions, FixtureMeta } from './types.js';
 export { parsePosts } from './parse.js';
 export { renderReader } from './render.js';
+export type { ThemeVars } from './theme.js';
+export { readThemeFromDocument, applyTheme, withAlpha, isTransparent } from './theme.js';
+export type { IconSizeOpts } from './layout.js';
+export { computeIconSizes, layoutIcons, DEFAULT_ICON_OPTS } from './layout.js';
