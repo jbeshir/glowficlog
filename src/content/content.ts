@@ -6,7 +6,13 @@
 // Defensive by contract: if the expected glowfic selectors are absent we do
 // nothing at all and leave the page untouched.
 
-import { parsePosts, renderReader } from '../reader-core/index.js';
+import {
+  parsePosts,
+  renderReader,
+  readThemeFromDocument,
+  applyTheme,
+  layoutIcons,
+} from '../reader-core/index.js';
 
 const STORAGE_KEY = 'glowficlog:enabled';
 const HIDDEN_CLASS = 'glr-hidden-original';
@@ -90,10 +96,27 @@ function activate(): void {
   if (posts.length === 0) return;
 
   const reader = renderReader(posts, { document, theme: detectTheme() });
+  // Colours follow the host glowfic theme (read BEFORE we hide the originals,
+  // while their computed styles are still observable). Cheap, so re-read on
+  // every (re)activation rather than caching.
+  applyTheme(reader, readThemeFromDocument(document));
   const first = containers[0];
   first.parentNode?.insertBefore(reader, first);
   containers.forEach((c) => c.classList.add(HIDDEN_CLASS));
   readerEl = reader;
+  // Icons can only be flow-sized once the reader is in a laid-out document.
+  layoutIcons(reader);
+}
+
+// Post heights — and therefore how far an icon may grow before meeting the next
+// same-side icon — change with viewport width, so re-flow icons on resize.
+let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+function onResize(): void {
+  if (resizeTimer !== null) clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    resizeTimer = null;
+    if (readerEl) layoutIcons(readerEl);
+  }, 120);
 }
 
 function deactivate(): void {
@@ -158,6 +181,7 @@ async function init(): Promise<void> {
 
   createToggle();
   document.addEventListener('keydown', onKeydown, true);
+  globalThis.addEventListener?.('resize', onResize);
 
   // Restore remembered state (OFF by default).
   const remembered = await loadEnabled();

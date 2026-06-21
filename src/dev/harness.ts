@@ -6,8 +6,8 @@
 // Driven by URL query params for deterministic screenshots:
 //   ?fixture=dialogue-2author&theme=dark[&raw=1]
 
-import { parsePosts, renderReader } from '../reader-core/index.js';
-import type { FixtureMeta } from '../reader-core/index.js';
+import { parsePosts, renderReader, applyTheme, layoutIcons } from '../reader-core/index.js';
+import type { FixtureMeta, ThemeVars } from '../reader-core/index.js';
 
 interface EmbeddedFixture {
   meta: FixtureMeta;
@@ -22,7 +22,36 @@ const fixtures: Record<string, EmbeddedFixture> =
 
 const names = Object.keys(fixtures).sort();
 
-type Theme = 'light' | 'dark';
+/**
+ * Preset host palettes approximating real glowfic themes. The reader is fed
+ * these via the SAME applyTheme() the content script calls on the live page, so
+ * the harness exercises the production colour path. `?theme=` selects one.
+ */
+interface Palette {
+  /** Flags the reader root `data-theme` (fallback colours only; applyTheme wins). */
+  readonly dark: boolean;
+  /** Host colours; also painted onto the harness page so screenshots blend in. */
+  readonly vars: ThemeVars;
+}
+
+const PALETTES: Record<string, Palette> = {
+  light: {
+    dark: false,
+    vars: { bg: '#ffffff', fg: '#1b1b1f', link: '#2563eb', border: '#e3e6eb' },
+  },
+  dark: {
+    dark: true,
+    vars: { bg: '#16171b', fg: '#e6e7ea', link: '#7aa2ff', border: '#2a2c33' },
+  },
+  sepia: {
+    dark: false,
+    vars: { bg: '#f4ecd8', fg: '#5b4636', link: '#9a3b2f', border: '#ddcdb0' },
+  },
+};
+
+type Theme = keyof typeof PALETTES;
+
+const themeNames = Object.keys(PALETTES) as Theme[];
 
 interface ViewState {
   fixture: string;
@@ -35,7 +64,9 @@ function readState(): ViewState {
   const fixtureParam = params.get('fixture');
   const fixture =
     fixtureParam && fixtures[fixtureParam] ? fixtureParam : (names[0] ?? '');
-  const theme: Theme = params.get('theme') === 'dark' ? 'dark' : 'light';
+  const themeParam = params.get('theme');
+  const theme: Theme =
+    themeParam && themeParam in PALETTES ? (themeParam as Theme) : 'light';
   const raw = params.get('raw') === '1' || params.get('raw') === 'true';
   return { fixture, theme, raw };
 }
@@ -81,7 +112,7 @@ function buildControls(state: ViewState, onChange: (next: ViewState) => void): H
 
   // Theme toggle.
   const themeSel = document.createElement('select');
-  for (const t of ['light', 'dark'] as Theme[]) {
+  for (const t of themeNames) {
     const opt = document.createElement('option');
     opt.value = t;
     opt.textContent = t;
@@ -117,9 +148,19 @@ function labelled(text: string, control: HTMLElement): HTMLElement {
   return wrap;
 }
 
+/** The reader currently on screen, so the resize handler can re-flow its icons. */
+let currentReader: HTMLElement | null = null;
+
 function render(state: ViewState): void {
   writeState(state);
-  document.body.setAttribute('data-theme', state.theme);
+  const palette = PALETTES[state.theme] ?? PALETTES.light;
+  // data-theme drives the harness chrome (and the reader's fallback colours);
+  // applyTheme below overrides the reader's actual colours regardless.
+  document.body.setAttribute('data-theme', palette.dark ? 'dark' : 'light');
+  // Paint the harness page itself in the host palette so the reader visibly
+  // blends into the surrounding "site" in screenshots.
+  document.body.style.background = palette.vars.bg;
+  document.body.style.color = palette.vars.fg;
 
   const app = document.getElementById('app');
   if (!app) return;
@@ -148,7 +189,10 @@ function render(state: ViewState): void {
 
   const fragment = fixtureFragment(entry.html);
   const posts = parsePosts(fragment);
-  const reader = renderReader(posts, { document, theme: state.theme });
+  const reader = renderReader(posts, { document, theme: palette.dark ? 'dark' : 'light' });
+  // Same colour path as the content script: blend the reader into the host.
+  applyTheme(reader, palette.vars);
+  currentReader = reader;
 
   const readerPane = document.createElement('div');
   readerPane.className = 'harness-pane';
@@ -168,7 +212,21 @@ function render(state: ViewState): void {
   }
 
   app.appendChild(stage);
+
+  // Icons can only be flow-sized once the reader is laid out in the document.
+  layoutIcons(reader);
 }
+
+// Re-flow icons on resize (debounced) — post heights, and thus how far an icon
+// can grow before meeting the next same-side icon, change with viewport width.
+let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+globalThis.addEventListener?.('resize', () => {
+  if (resizeTimer !== null) clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    resizeTimer = null;
+    if (currentReader) layoutIcons(currentReader);
+  }, 120);
+});
 
 function paneHeading(text: string): HTMLElement {
   const h = document.createElement('h2');
