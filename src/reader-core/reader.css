@@ -291,6 +291,12 @@
   margin-bottom: 8px;
 }
 
+/* Mirror the header toward the post's icon side: right-gutter posts align the
+   name to the right so it sits under its icon; left-gutter posts stay left. */
+.glr-post--right .glr-identity {
+  justify-content: flex-end;
+}
+
 /* Character name: the most prominent line of the post header — full fg, bold,
    a touch larger than body text so it clearly leads each post. */
 .glr-identity--full .glr-char {
