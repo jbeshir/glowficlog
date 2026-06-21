@@ -115,9 +115,27 @@ for (const meta of manifest) {
         `post ${i} is on the ${side}`,
       );
       // Structural children all present + scoped.
-      assert.ok(el.querySelector('.glr-icon-cell'), `post ${i} has icon cell`);
+      assert.ok(el.querySelector('.glr-arm'), `post ${i} has a gutter arm`);
+      assert.ok(el.querySelector('.glr-band'), `post ${i} has a text band`);
+      assert.ok(el.querySelector('.glr-icon-box'), `post ${i} has an icon box`);
       assert.ok(el.querySelector('.glr-body'), `post ${i} has body`);
       assert.ok(el.querySelector('.glr-content'), `post ${i} has content`);
+
+      // The L's two strokes (band + arm) carry the SAME stripe as the post, and
+      // posts alternate stripe by parity so adjacent L-blocks interlock.
+      const stripe = i % 2 === 0 ? 'a' : 'b';
+      assert.ok(
+        el.classList.contains(`glr-stripe-${stripe}`),
+        `post ${i} is stripe ${stripe}`,
+      );
+      assert.ok(
+        el.querySelector(`.glr-arm.glr-stripe-${stripe}`),
+        `post ${i} arm carries stripe ${stripe}`,
+      );
+      assert.ok(
+        el.querySelector(`.glr-band.glr-stripe-${stripe}`),
+        `post ${i} band carries stripe ${stripe}`,
+      );
     });
 
     // First-appearance logic: first occurrence of each identity is --first.
@@ -141,7 +159,7 @@ for (const meta of manifest) {
     // markup which legitimately keeps the host page's own classes).
     const ours = [
       reader,
-      ...Array.from(reader.querySelectorAll('.glr-post, .glr-icon-cell, .glr-body, .glr-identity, .glr-column')),
+      ...Array.from(reader.querySelectorAll('.glr-post, .glr-arm, .glr-band, .glr-body, .glr-identity, .glr-column')),
     ];
     for (const el of ours) {
       for (const cls of Array.from(el.classList)) {
@@ -290,6 +308,95 @@ test('absence variants: every edge case parses without throwing', () => {
   // Author-only render still shows an identity (author chip/full).
   const authorOnlyArticle = reader.querySelector('.glr-identity--authoronly');
   assert.ok(authorOnlyArticle, 'author-only identity rendered');
+});
+
+// ---------------------------------------------------------------------------
+// Change 1 — paginated reply pages (page 2+): a fragment with ONLY .post-reply
+// containers and NO original post must still parse and render.
+// ---------------------------------------------------------------------------
+test('reply-only pagination: a fragment with no OP parses and renders', () => {
+  const html = `
+    <div class="post-list">
+      <div class="post-container post-reply">
+        <a class="noheight" id="reply-301"></a>
+        <div class="post-info-box">
+          <div class="post-icon"><img src="https://cdn.example/a.png" alt="ka" title="ka"></div>
+          <div class="post-character">Ada</div>
+          <div class="post-author">Author-A</div>
+        </div>
+        <div class="post-edit-box"><a rel="alternate" href="/replies/301#reply-301">l</a></div>
+        <div class="post-content"><p>Reply on page two.</p></div>
+      </div>
+      <div class="post-container post-reply">
+        <a class="noheight" id="reply-302"></a>
+        <div class="post-info-box">
+          <div class="post-icon"><img src="https://cdn.example/b.png" alt="kb" title="kb"></div>
+          <div class="post-character">Ben</div>
+          <div class="post-author">Author-B</div>
+        </div>
+        <div class="post-edit-box"><a rel="alternate" href="/replies/302#reply-302">l</a></div>
+        <div class="post-content"><p>Another reply, still no OP.</p></div>
+      </div>
+    </div>`;
+  const dom = domFor(html);
+  const doc = dom.window.document;
+
+  // No OP anywhere on this (paginated) page.
+  assert.equal(doc.querySelector('.post-post'), null, 'fixture has no OP');
+
+  const posts = parsePosts(doc);
+  assert.equal(posts.length, 2, 'both replies parsed without an OP');
+  assert.ok(posts.every((p) => !p.isOP), 'no post is flagged OP');
+  assert.deepEqual(posts.map((p) => p.id), ['301', '302'], 'reply ids derived');
+
+  let reader!: HTMLElement;
+  assert.doesNotThrow(() => {
+    reader = renderReader(posts, { document: doc, theme: 'dark' });
+  }, 'renderReader must not throw on reply-only input');
+  assert.equal(reader.querySelectorAll('.glr-post').length, 2, 'two posts rendered');
+  assert.equal(reader.querySelectorAll('.glr-arm').length, 2, 'each post has an arm');
+});
+
+// ---------------------------------------------------------------------------
+// Change 2 — the CRITICAL coloring rule: a gutter arm carries its OWN post's
+// stripe, never the neighbour's. With alternating parity, post 0 (left, stripe a)
+// and post 2 (left, stripe a) sit on the same side; the arm flowing through the
+// gutter beside the right-side post 1 must stay stripe a — owned by its icon's
+// post, not the text beside it.
+// ---------------------------------------------------------------------------
+test('gutter-arm tint follows the icon owner, not the adjacent text post', () => {
+  const html = `
+    <div class="post-list">
+      <div class="post-container post-reply"><div class="post-character">L0</div>
+        <div class="post-author">A0</div><div class="post-content"><p>left zero</p></div></div>
+      <div class="post-container post-reply"><div class="post-character">R1</div>
+        <div class="post-author">A1</div><div class="post-content"><p>right one</p></div></div>
+      <div class="post-container post-reply"><div class="post-character">L2</div>
+        <div class="post-author">A2</div><div class="post-content"><p>left two</p></div></div>
+    </div>`;
+  const dom = domFor(html);
+  const doc = dom.window.document;
+  const reader = renderReader(parsePosts(doc), { document: doc });
+
+  const posts = Array.from(reader.querySelectorAll('.glr-post'));
+  // Post 0: left + stripe a; its arm is in the LEFT gutter and is stripe a.
+  assert.ok(posts[0].classList.contains('glr-post--left'));
+  assert.ok(posts[0].querySelector('.glr-arm--left.glr-stripe-a'), 'post 0 arm: left, stripe a');
+  // Post 1: right + stripe b; its arm is in the RIGHT gutter and is stripe b.
+  assert.ok(posts[1].classList.contains('glr-post--right'));
+  assert.ok(posts[1].querySelector('.glr-arm--right.glr-stripe-b'), 'post 1 arm: right, stripe b');
+  // Post 2: left + stripe a again — the same gutter side as post 0, so post 0's
+  // arm flows down past post 1 carrying stripe a the whole way.
+  assert.ok(posts[2].querySelector('.glr-arm--left.glr-stripe-a'), 'post 2 arm: left, stripe a');
+
+  // The left gutter only ever holds stripe-a arms; the right only stripe-b — so
+  // no arm is ever tinted by the post whose TEXT is beside it.
+  for (const arm of reader.querySelectorAll('.glr-arm--left')) {
+    assert.ok(arm.classList.contains('glr-stripe-a'), 'every left arm is stripe a');
+  }
+  for (const arm of reader.querySelectorAll('.glr-arm--right')) {
+    assert.ok(arm.classList.contains('glr-stripe-b'), 'every right arm is stripe b');
+  }
 });
 
 test('defensive: empty / containerless roots return an empty frozen array', () => {

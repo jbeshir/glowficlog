@@ -6,4 +6,10 @@ export { renderReader } from './render.js';
 export type { ThemeVars } from './theme.js';
 export { readThemeFromDocument, applyTheme, withAlpha, isTransparent } from './theme.js';
 export type { IconSizeOpts } from './layout.js';
-export { computeIconSizes, layoutIcons, DEFAULT_ICON_OPTS } from './layout.js';
+export {
+  computeIconSegments,
+  computeIconSizes,
+  layoutIcons,
+  DEFAULT_ICON_OPTS,
+} from './layout.js';
+export { commonAncestor } from './dom.js';

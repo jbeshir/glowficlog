@@ -148,10 +148,16 @@ export function readThemeFromDocument(doc: Document): ThemeVars {
 
 /**
  * Apply a {@link ThemeVars} to a reader root as CSS custom properties. Sets the
- * four sampled colours plus three derived translucent variants:
- *   `--glr-muted`   fg @ 0.65 (secondary text)
- *   `--glr-sep`     border (or fg) @ 0.14 (separators / hairlines)
- *   `--glr-chip-bg` link @ 0.16 (name-chip + first-appearance accent wash)
+ * four sampled colours plus derived translucent variants:
+ *   `--glr-muted`     fg @ 0.65 (secondary text)
+ *   `--glr-sep`       border (or fg) @ 0.14 (separators / hairlines)
+ *   `--glr-chip-bg`   link @ 0.16 (name-chip + first-appearance accent wash)
+ *   `--glr-stripe-a`  fg @ 0.045 (subtle L-block tint, even posts)
+ *   `--glr-stripe-b`  fg @ 0.09  (subtle L-block tint, odd posts)
+ *
+ * The two stripes are low-alpha overlays of the host FOREGROUND, so they lift
+ * off the host background on both light and dark themes (a dark page's fg is
+ * light, lightening the stripe; a light page's fg darkens it).
  *
  * Empty inputs are skipped so `reader.css`'s defaults remain in effect.
  */
@@ -167,6 +173,8 @@ export function applyTheme(rootEl: HTMLElement, vars: ThemeVars): void {
 
   if (vars.fg && !isTransparent(vars.fg)) {
     set('--glr-muted', withAlpha(vars.fg, 0.65));
+    set('--glr-stripe-a', withAlpha(vars.fg, 0.045));
+    set('--glr-stripe-b', withAlpha(vars.fg, 0.09));
   }
   const sepBase = !isTransparent(vars.border) ? vars.border : vars.fg;
   if (sepBase && !isTransparent(sepBase)) {

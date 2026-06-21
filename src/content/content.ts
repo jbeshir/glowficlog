@@ -12,6 +12,7 @@ import {
   readThemeFromDocument,
   applyTheme,
   layoutIcons,
+  commonAncestor,
 } from '../reader-core/index.js';
 
 const STORAGE_KEY = 'glowficlog:enabled';
@@ -82,14 +83,37 @@ function detectTheme(): 'light' | 'dark' {
   return 'light';
 }
 
-/** True only when this looks like a glowfic thread we can read. */
+/** True for ANY glowfic thread page — including paginated reply pages
+ *  (`/posts/{id}?page=2+`) that contain only `.post-reply` containers and no OP.
+ *  Detection keys off the presence of a `.post-container`, never the OP. */
 function isThreadPage(): boolean {
   return document.querySelector('.post-container') !== null;
 }
 
+/** Where to insert the reader: just before the element that contains the post
+ *  list (the `.post-container`s' common ancestor), so we don't assume an OP
+ *  exists. Falls back to the first container's parent, or the container itself,
+ *  for degenerate DOM shapes. */
+function readerAnchor(containers: readonly HTMLElement[]): HTMLElement {
+  const first = containers[0];
+  const lca = commonAncestor(containers);
+  // If the LCA *is* a post container (single post, or one nested in another),
+  // the wrapper is its parent. Otherwise the LCA already is the list wrapper.
+  const wrapper =
+    lca && !containers.includes(lca as HTMLElement)
+      ? (lca as HTMLElement)
+      : (first.parentElement ?? first);
+  // Don't reach above the body/root — that would place the reader outside the
+  // content region. Use the wrapper only when it sits inside the body.
+  if (wrapper === document.body || wrapper === document.documentElement) {
+    return first;
+  }
+  return wrapper;
+}
+
 function activate(): void {
   if (readerEl) return;
-  const containers = document.querySelectorAll<HTMLElement>('.post-container');
+  const containers = Array.from(document.querySelectorAll<HTMLElement>('.post-container'));
   if (containers.length === 0) return; // selectors absent → no-op
 
   const posts = parsePosts(document);
@@ -100,8 +124,10 @@ function activate(): void {
   // while their computed styles are still observable). Cheap, so re-read on
   // every (re)activation rather than caching.
   applyTheme(reader, readThemeFromDocument(document));
-  const first = containers[0];
-  first.parentNode?.insertBefore(reader, first);
+  const anchor = readerAnchor(containers);
+  anchor.parentNode?.insertBefore(reader, anchor);
+  // Hide each original container individually (minimal, reversible mutation that
+  // leaves sibling page chrome — pagination, headers — untouched).
   containers.forEach((c) => c.classList.add(HIDDEN_CLASS));
   readerEl = reader;
   // Icons can only be flow-sized once the reader is in a laid-out document.

@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 
 import {
+  computeIconSegments,
   computeIconSizes,
   layoutIcons,
   renderReader,
@@ -85,6 +86,44 @@ test('DEFAULT_ICON_OPTS are within the spec ranges', () => {
 });
 
 // ---------------------------------------------------------------------------
+// computeIconSegments — the (uncapped) arm flow segment
+// ---------------------------------------------------------------------------
+
+test('computeIconSegments: arm spans the whole gap to the next same-side icon', () => {
+  // 200px to the next same-side icon → segment 200 - gap(8) = 192, UNCAPPED
+  // (the arm fills the flow segment even though the icon image would cap at 100).
+  const segs = computeIconSegments([0, 200], 1000, OPTS);
+  assert.equal(segs[0], 192, 'arm height is the full span minus clearance, not the cap');
+});
+
+test('computeIconSegments: last arm runs to the container bottom', () => {
+  const segs = computeIconSegments([0, 100], 600, OPTS);
+  assert.equal(segs[1], 600 - 100 - OPTS.gap, 'last arm reaches container bottom');
+});
+
+test('computeIconSegments: dense / degenerate spans floor at min', () => {
+  const segs = computeIconSegments([0, 24, 24], 500, OPTS);
+  assert.ok(segs.every((s) => s >= OPTS.min), 'no arm shorter than min');
+});
+
+test('computeIconSizes is the segment capped at cap', () => {
+  // Same inputs: the IMAGE caps at cap while the ARM (segment) does not.
+  const tops = [0, 400];
+  const segs = computeIconSegments(tops, 1000, OPTS);
+  const sizes = computeIconSizes(tops, 1000, OPTS);
+  assert.equal(segs[0], 392, 'arm segment uncapped');
+  assert.equal(sizes[0], OPTS.cap, 'icon image capped');
+  assert.equal(sizes[0], Math.min(OPTS.cap, segs[0]), 'size = min(cap, segment)');
+});
+
+test('computeIconSegments: does not mutate its input', () => {
+  const tops = [0, 50, 100];
+  const copy = [...tops];
+  computeIconSegments(tops, 500, OPTS);
+  assert.deepEqual(tops, copy, 'input array untouched');
+});
+
+// ---------------------------------------------------------------------------
 // layoutIcons — DOM measure-and-apply with mocked offsetTop
 // ---------------------------------------------------------------------------
 
@@ -110,25 +149,26 @@ function readerWithPosts(n: number): { dom: JSDOM; reader: HTMLElement } {
   return { dom, reader };
 }
 
-/** Mock the layout geometry jsdom does not compute. */
-function mockGeometry(reader: HTMLElement, topFor: (cell: HTMLElement, side: string, i: number) => number, columnHeight: number): void {
+/** Mock the layout geometry jsdom does not compute: each post's offsetTop (the
+ *  arm is pinned to its post top) and the column height. */
+function mockGeometry(reader: HTMLElement, topFor: (post: HTMLElement, side: string, i: number) => number, columnHeight: number): void {
   const column = reader.querySelector('.glr-column') as HTMLElement;
   Object.defineProperty(column, 'offsetHeight', { value: columnHeight, configurable: true });
   for (const side of ['left', 'right']) {
-    const cells = Array.from(
-      reader.querySelectorAll<HTMLElement>(`.glr-post--${side} .glr-icon-cell`),
+    const posts = Array.from(
+      reader.querySelectorAll<HTMLElement>(`.glr-post--${side}`),
     );
-    cells.forEach((cell, i) => {
-      Object.defineProperty(cell, 'offsetTop', { value: topFor(cell, side, i), configurable: true });
+    posts.forEach((post, i) => {
+      Object.defineProperty(post, 'offsetTop', { value: topFor(post, side, i), configurable: true });
     });
   }
 }
 
-test('layoutIcons: applies square sizes from mocked offsetTop', () => {
+test('layoutIcons: applies square icon sizes and arm heights from mocked offsetTop', () => {
   const { reader } = readerWithPosts(4);
   // Posts 0,2 are left (rows at 0, 200); posts 1,3 are right (rows at 100, 300).
-  // Spacing of 200 between same-side icons → both grow to cap. Column tall.
-  mockGeometry(reader, (_cell, _side, i) => i * 200, 1000);
+  // Spacing of 200 between same-side icons. Column tall.
+  mockGeometry(reader, (_post, _side, i) => i * 200, 1000);
 
   layoutIcons(reader);
 
@@ -138,27 +178,42 @@ test('layoutIcons: applies square sizes from mocked offsetTop', () => {
     assert.equal(box.style.width, box.style.height, 'icon box is square');
     assert.ok(box.style.width.endsWith('px'), 'size written in px');
   }
-  // Left side first icon: next same-side top is 200 away → cap.
-  const leftBoxes = Array.from(
-    reader.querySelectorAll<HTMLElement>('.glr-post--left .glr-icon-box'),
+  // Left side first icon: next same-side top is 200 away → image caps at 100,
+  // but the ARM spans the full segment (200 - gap 8 = 192).
+  const leftPost = reader.querySelector('.glr-post--left') as HTMLElement;
+  assert.equal(
+    (leftPost.querySelector('.glr-icon-box') as HTMLElement).style.width,
+    '100px',
+    'isolated icon image grows to cap',
   );
-  assert.equal(leftBoxes[0].style.width, '100px', 'isolated icon grows to cap');
+  assert.equal(
+    (leftPost.querySelector('.glr-arm') as HTMLElement).style.height,
+    '192px',
+    'arm height is the uncapped flow segment',
+  );
 });
 
-test('layoutIcons: dense same-side run stays at min', () => {
+test('layoutIcons: dense same-side run keeps icons AND arms at min', () => {
   const { reader } = readerWithPosts(6);
   // Pack same-side icons only 10px apart → available 10 - gap(8) = 2 < min.
-  mockGeometry(reader, (_cell, _side, i) => i * 10, 1000);
+  mockGeometry(reader, (_post, _side, i) => i * 10, 1000);
   layoutIcons(reader);
 
-  const leftBoxes = Array.from(
-    reader.querySelectorAll<HTMLElement>('.glr-post--left .glr-icon-box'),
-  );
+  const leftPost = reader.querySelector('.glr-post--left') as HTMLElement;
   // Non-last left icons are floored at min (26px); only the last can grow.
-  assert.equal(leftBoxes[0].style.width, '26px', 'dense run floored at min');
+  assert.equal(
+    (leftPost.querySelector('.glr-icon-box') as HTMLElement).style.width,
+    '26px',
+    'dense run icon floored at min',
+  );
+  assert.equal(
+    (leftPost.querySelector('.glr-arm') as HTMLElement).style.height,
+    '26px',
+    'dense run arm floored at min',
+  );
 });
 
-test('layoutIcons: no icon cells is a safe no-op', () => {
+test('layoutIcons: no posts is a safe no-op', () => {
   const dom = new JSDOM('<!DOCTYPE html><html><body><div class="glr-reader"><div class="glr-column"></div></div></body></html>');
   const reader = dom.window.document.querySelector('.glr-reader') as HTMLElement;
   assert.doesNotThrow(() => layoutIcons(reader));
@@ -168,13 +223,13 @@ test('layoutIcons: no icon cells is a safe no-op', () => {
 // render: icon box structure + onerror monogram fallback
 // ---------------------------------------------------------------------------
 
-test('renderReader emits an icon box per post inside the cell', () => {
+test('renderReader emits an icon box per post inside its arm', () => {
   const { reader } = readerWithPosts(3);
-  const cells = reader.querySelectorAll('.glr-icon-cell');
-  assert.equal(cells.length, 3);
-  for (const cell of cells) {
-    const box = cell.querySelector('.glr-icon-box');
-    assert.ok(box, 'cell contains a .glr-icon-box');
+  const arms = reader.querySelectorAll('.glr-arm');
+  assert.equal(arms.length, 3);
+  for (const arm of arms) {
+    const box = arm.querySelector('.glr-icon-box');
+    assert.ok(box, 'arm contains a .glr-icon-box');
     assert.ok(box!.querySelector('.glr-icon'), 'box contains the icon img');
   }
 });

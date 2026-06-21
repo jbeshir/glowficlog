@@ -117,6 +117,24 @@ test('applyTheme sets the four base vars and three derived ones', () => {
   assert.equal(root.style.getPropertyValue('--glr-muted'), 'rgba(27, 27, 31, 0.65)');
   assert.equal(root.style.getPropertyValue('--glr-sep'), 'rgba(229, 231, 235, 0.14)');
   assert.equal(root.style.getPropertyValue('--glr-chip-bg'), 'rgba(37, 99, 235, 0.16)');
+  // Stripe tints derive from the foreground at two low alphas.
+  assert.equal(root.style.getPropertyValue('--glr-stripe-a'), 'rgba(27, 27, 31, 0.045)');
+  assert.equal(root.style.getPropertyValue('--glr-stripe-b'), 'rgba(27, 27, 31, 0.09)');
+});
+
+test('applyTheme derives both stripe tints from the host foreground', () => {
+  const { root } = freshRoot();
+  // A dark host: light fg → the stripes lighten the dark page (both readable).
+  applyTheme(root, { bg: 'rgb(18, 18, 22)', fg: 'rgb(235, 235, 240)', link: '#7aa2ff', border: '' });
+  assert.equal(root.style.getPropertyValue('--glr-stripe-a'), 'rgba(235, 235, 240, 0.045)');
+  assert.equal(root.style.getPropertyValue('--glr-stripe-b'), 'rgba(235, 235, 240, 0.09)');
+});
+
+test('applyTheme leaves stripe tints unset when fg is missing', () => {
+  const { root } = freshRoot();
+  applyTheme(root, { bg: '#fff', fg: '', link: '#2563eb', border: '#ccc' });
+  assert.equal(root.style.getPropertyValue('--glr-stripe-a'), '', 'no stripe without fg');
+  assert.equal(root.style.getPropertyValue('--glr-stripe-b'), '');
 });
 
 test('applyTheme leaves vars unset for empty inputs (CSS fallback survives)', () => {

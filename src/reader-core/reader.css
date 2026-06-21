@@ -16,13 +16,16 @@
   --glr-col-max: 1100px;       /* text column max-width (Req 1: wide reading column) */
   --glr-gutter: 112px;         /* each icon gutter ≈ icon cap (100px) + spacing */
   --glr-gap: 14px;             /* column gap between gutter and text */
-  --glr-row-pad: 6px;          /* minimal vertical padding per post */
+  --glr-row-pad: 8px;          /* vertical padding per post */
   --glr-sep-width: 1px;        /* separator hairline thickness */
+  --glr-radius: 9px;           /* outer-corner rounding of each L block */
+  --glr-body-size: 15.5px;     /* comfortable body font-size (Req 3) */
+  --glr-measure: 78ch;         /* max text line length within the wide band */
 
   /* icon flow-sizing tunables (read by layoutIcons) */
   --glr-icon-min: 26px;        /* floor ≈ one line height: dense runs stay tiny */
-  --glr-icon-cap: 100px;       /* ceiling ≈ glowfic native max */
-  --glr-icon-gap: 8px;         /* clearance kept below an icon */
+  --glr-icon-cap: 100px;       /* ceiling ≈ glowfic native max (icon image only) */
+  --glr-icon-gap: 8px;         /* clearance kept below an arm */
 
   /* colour palette — fallback defaults; overridden inline by applyTheme and by
      [data-theme="dark"] below. */
@@ -34,6 +37,10 @@
   --glr-sep: rgba(27, 27, 31, 0.12);
   --glr-chip-bg: rgba(37, 99, 235, 0.16);
   --glr-pop-shadow: rgba(0, 0, 0, 0.25);
+  /* Two subtle stripe tints derived from the host fg; overridden by applyTheme.
+     Low-alpha overlays so they read on light AND dark host themes. */
+  --glr-stripe-a: rgba(27, 27, 31, 0.045);
+  --glr-stripe-b: rgba(27, 27, 31, 0.09);
 
   box-sizing: border-box;
   width: 100%;
@@ -56,6 +63,8 @@
   --glr-sep: rgba(230, 231, 234, 0.14);
   --glr-chip-bg: rgba(122, 162, 255, 0.18);
   --glr-pop-shadow: rgba(0, 0, 0, 0.6);
+  --glr-stripe-a: rgba(230, 231, 234, 0.05);
+  --glr-stripe-b: rgba(230, 231, 234, 0.1);
 }
 
 .glr-reader *,
@@ -73,8 +82,13 @@
   padding: 0 12px;
 }
 
-/* One post: [left gutter][text][right gutter]. */
+/*
+ * One post: [left gutter][text][right gutter]. The post is the positioning
+ * context for its three absolutely/grid-placed layers — the BAND and ARM (both
+ * absolute, so they never affect row height) and the BODY (the only grid item).
+ */
 .glr-post {
+  position: relative;
   display: grid;
   grid-template-columns: var(--glr-gutter) minmax(0, 1fr) var(--glr-gutter);
   column-gap: var(--glr-gap);
@@ -90,32 +104,79 @@
   border-top: none;
 }
 
+.glr-body {
+  grid-column: 2;
+  min-width: 0;
+}
+
 .glr-post--op .glr-body {
   border-left: 2px solid var(--glr-link);
   padding-left: 10px;
 }
 
-/* Gutter placement + alternation. The body is always grid-column 2. */
-.glr-post--left .glr-icon-cell { grid-column: 1; }
-.glr-post--left .glr-body { grid-column: 2; }
-.glr-post--right .glr-body { grid-column: 2; }
-.glr-post--right .glr-icon-cell { grid-column: 3; }
+/*
+ * Stripe tints. Only the BAND and ARM carry a background; the article keeps the
+ * stripe class purely as a data hook (so a post's tint is identifiable in the
+ * DOM) WITHOUT painting the whole row, which would bleed into the other gutter.
+ */
+.glr-band.glr-stripe-a,
+.glr-arm.glr-stripe-a { background: var(--glr-stripe-a); }
+.glr-band.glr-stripe-b,
+.glr-arm.glr-stripe-b { background: var(--glr-stripe-b); }
 
 /*
- * Icon flow-sizing. The cell is a relatively-positioned, grid-stretched anchor
- * whose offsetTop layoutIcons measures. The square BOX is absolutely pinned to
- * the cell's top edge, so it NEVER contributes to row height and is free to grow
- * DOWNWARD past the message boundary into the adjacent (opposite-side, empty)
- * gutter. layoutIcons writes its width/height; until it runs the box shows at
- * the CSS min size.
+ * BAND — the horizontal stroke of the L, behind the text. It spans the text
+ * column PLUS the gap on the icon side (so it meets the arm flush) and stops at
+ * the text edge on the OTHER side, never entering the opposite gutter.
  */
-.glr-icon-cell {
-  position: relative;
+.glr-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+.glr-post--left .glr-band {
+  left: var(--glr-gutter);
+  right: calc(var(--glr-gutter) + var(--glr-gap));
+  border-radius: 0 var(--glr-radius) var(--glr-radius) 0;
+}
+.glr-post--right .glr-band {
+  left: calc(var(--glr-gutter) + var(--glr-gap));
+  right: var(--glr-gutter);
+  border-radius: var(--glr-radius) 0 0 var(--glr-radius);
 }
 
+/*
+ * ARM — the vertical stroke of the L, in the post's gutter, carrying the post's
+ * OWN tint and holding its icon at the top. It is absolutely pinned to the post
+ * top (top: 0) and layoutIcons sets its height to the flow segment, so it grows
+ * DOWNWARD past the message boundary into the adjacent (opposite-side, empty)
+ * gutter. Because the tint travels with the icon, a gutter region is always
+ * coloured by the post whose icon occupies it — not the text beside it.
+ */
+.glr-arm {
+  position: absolute;
+  top: 0;
+  width: var(--glr-gutter);
+  height: var(--glr-icon-min); /* placeholder until layoutIcons measures */
+}
+.glr-post--left .glr-arm {
+  left: 0;
+  border-radius: var(--glr-radius) 0 0 var(--glr-radius);
+}
+.glr-post--right .glr-arm {
+  right: 0;
+  border-radius: 0 var(--glr-radius) var(--glr-radius) 0;
+}
+
+/*
+ * Icon box: the square picture/monogram at the TOP of its arm, aligned with the
+ * post's first line. layoutIcons writes its width/height; until then it shows at
+ * the CSS min size. z-index lifts it (and its hover preview) above later posts.
+ */
 .glr-icon-box {
   position: absolute;
-  top: 4px;
+  top: var(--glr-row-pad);
   width: var(--glr-icon-min);
   height: var(--glr-icon-min);
   border-radius: 6px;
@@ -175,9 +236,12 @@
   display: block;
 }
 
-/* Text body. */
+/* Text body. Positioned so it paints ABOVE its post's translucent band; the
+   full --glr-fg text therefore keeps its contrast rather than reading through
+   the tint. (grid-column + min-width are set with the layout rules above.) */
 .glr-body {
-  min-width: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .glr-identity {
@@ -237,8 +301,14 @@
   color: var(--glr-link);
 }
 
-/* Compact post-content typography (minimise vertical padding). */
+/* Body typography (Req 3): full foreground colour, comfortable size/leading, and
+   a capped measure so the wide band stays readable. The BAND/L still spans the
+   whole column; only the text line length is bounded. */
 .glr-content {
+  color: var(--glr-fg);
+  font-size: var(--glr-body-size);
+  line-height: 1.6;
+  max-width: var(--glr-measure);
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
@@ -247,7 +317,7 @@
 .glr-content > :last-child { margin-bottom: 0; }
 
 .glr-content p {
-  margin: 0 0 0.4em;
+  margin: 0 0 0.7em;
 }
 
 .glr-content blockquote {
