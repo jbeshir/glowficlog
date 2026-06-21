@@ -1,0 +1,295 @@
+/*
+ * glowficlog reader styles. EVERY selector is prefixed `glr-` so nothing leaks
+ * into the host page and the host page cannot accidentally style the reader.
+ * Tunables are CSS custom properties on `.glr-reader`.
+ */
+
+.glr-reader {
+  /* tunables */
+  --glr-gutter: 64px;
+  --glr-icon-cap: 56px;        /* max icon edge for first-appearance posts */
+  --glr-icon-cap-repeat: 38px; /* smaller cap for condensed repeats */
+  --glr-col-max: 760px;
+  --glr-sep: 1px;
+  --glr-row-pad: 6px;          /* minimal vertical padding per post */
+  --glr-gap: 10px;             /* column gap between gutter and text */
+
+  /* light theme palette (overridden by [data-theme="dark"]) */
+  --glr-bg: #ffffff;
+  --glr-fg: #1b1b1f;
+  --glr-muted: #6b7280;
+  --glr-sep-color: #e5e7eb;
+  --glr-chip-bg: #eef2ff;
+  --glr-chip-fg: #3730a3;
+  --glr-accent: #2563eb;
+  --glr-ph-bg: #e5e7eb;
+  --glr-ph-fg: #6b7280;
+  --glr-pop-bg: #ffffff;
+  --glr-pop-shadow: rgba(0, 0, 0, 0.25);
+
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 12px 0 48px;
+  background: var(--glr-bg);
+  color: var(--glr-fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.glr-reader[data-theme="dark"] {
+  --glr-bg: #16171b;
+  --glr-fg: #e6e7ea;
+  --glr-muted: #9aa0aa;
+  --glr-sep-color: #2a2c33;
+  --glr-chip-bg: #26304d;
+  --glr-chip-fg: #c7d2fe;
+  --glr-accent: #7aa2ff;
+  --glr-ph-bg: #2a2c33;
+  --glr-ph-fg: #aab0ba;
+  --glr-pop-bg: #1f2127;
+  --glr-pop-shadow: rgba(0, 0, 0, 0.6);
+}
+
+.glr-reader *,
+.glr-reader *::before,
+.glr-reader *::after {
+  box-sizing: border-box;
+}
+
+/* Continuous centred column. */
+.glr-column {
+  max-width: calc(var(--glr-col-max) + 2 * var(--glr-gutter) + 2 * var(--glr-gap));
+  margin: 0 auto;
+  padding: 0 12px;
+}
+
+/* One post: [left gutter][text][right gutter]. */
+.glr-post {
+  display: grid;
+  grid-template-columns: var(--glr-gutter) minmax(0, 1fr) var(--glr-gutter);
+  column-gap: var(--glr-gap);
+  align-items: stretch;
+  padding: var(--glr-row-pad) 0;
+}
+
+.glr-post + .glr-post {
+  border-top: var(--glr-sep) solid var(--glr-sep-color);
+}
+
+.glr-post--op {
+  border-top: none;
+}
+
+.glr-post--op .glr-body {
+  border-left: 2px solid var(--glr-accent);
+  padding-left: 10px;
+}
+
+/* Gutter placement + alternation. The body is always grid-column 2. */
+.glr-post--left .glr-icon-cell { grid-column: 1; }
+.glr-post--left .glr-body { grid-column: 2; }
+.glr-post--right .glr-body { grid-column: 2; }
+.glr-post--right .glr-icon-cell { grid-column: 3; }
+
+/* Repeats get a smaller icon cap. */
+.glr-post--repeat { --glr-icon-cap: var(--glr-icon-cap-repeat); }
+
+/*
+ * Height-fitting: the icon is absolutely positioned inside its (relatively
+ * positioned, grid-stretched) cell, so it NEVER contributes to the row height.
+ * The row height is therefore set by the text body alone, and the icon's
+ * max-height resolves against that — `min(100%, cap)` makes a one-line post get
+ * a tiny icon and a long post get a capped one.
+ */
+.glr-icon-cell {
+  position: relative;
+  min-height: 1.2em;
+}
+
+.glr-icon-wrap {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: flex-start;
+}
+
+.glr-post--left .glr-icon-wrap { justify-content: flex-end; }
+.glr-post--right .glr-icon-wrap { justify-content: flex-start; }
+
+.glr-icon {
+  max-height: min(100%, var(--glr-icon-cap));
+  max-width: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 5px;
+  display: block;
+  background: var(--glr-ph-bg);
+}
+
+/* Full-size hover/focus preview. */
+.glr-icon-pop {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  width: 100px;
+  max-width: none;
+  height: auto;
+  z-index: 50;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--glr-pop-bg);
+  box-shadow: 0 6px 24px var(--glr-pop-shadow);
+  pointer-events: none;
+}
+
+.glr-icon-wrap:hover .glr-icon-pop,
+.glr-icon-wrap:focus-within .glr-icon-pop {
+  display: block;
+}
+
+/* Iconless placeholder: small, height-capped, never inflates the row. */
+.glr-icon-ph {
+  position: absolute;
+  top: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--glr-ph-bg);
+  color: var(--glr-ph-fg);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+}
+
+.glr-post--left .glr-icon-ph { right: 0; }
+.glr-post--right .glr-icon-ph { left: 0; }
+
+/* Text body. */
+.glr-body {
+  min-width: 0;
+}
+
+.glr-identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.glr-identity--full .glr-char {
+  font-weight: 700;
+  color: var(--glr-fg);
+}
+
+.glr-identity--full .glr-screen {
+  font-style: italic;
+  color: var(--glr-muted);
+  font-size: 0.85em;
+}
+
+.glr-identity--full .glr-author {
+  color: var(--glr-muted);
+  font-size: 0.85em;
+}
+
+.glr-identity--full .glr-author::before {
+  content: "by ";
+  opacity: 0.7;
+}
+
+.glr-chip {
+  display: inline-block;
+  padding: 0 7px;
+  border-radius: 9px;
+  background: var(--glr-chip-bg);
+  color: var(--glr-chip-fg);
+  font-size: 0.78em;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.glr-permalink {
+  color: var(--glr-muted);
+  text-decoration: none;
+  font-size: 0.8em;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.glr-post:hover .glr-permalink {
+  opacity: 0.7;
+}
+
+.glr-permalink:hover {
+  opacity: 1;
+  color: var(--glr-accent);
+}
+
+/* Compact post-content typography (minimise vertical padding). */
+.glr-content {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.glr-content > :first-child { margin-top: 0; }
+.glr-content > :last-child { margin-bottom: 0; }
+
+.glr-content p {
+  margin: 0 0 0.4em;
+}
+
+.glr-content blockquote {
+  margin: 0.4em 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--glr-sep-color);
+  color: var(--glr-muted);
+}
+
+.glr-content img {
+  max-width: 100%;
+  height: auto;
+}
+
+.glr-content a {
+  color: var(--glr-accent);
+}
+
+/* ---- Host-page integration helpers (used by the content script) ---- */
+
+/* Applied to original glowfic post containers while the reader is active. */
+.glr-hidden-original {
+  display: none !important;
+}
+
+/* Floating toggle button injected by the content script. */
+.glr-toggle {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2147483646;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #ffffff;
+  font: 600 13px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.glr-toggle:hover { background: #1d4ed8; }
+.glr-toggle[aria-pressed="true"] { background: #047857; }
+.glr-toggle:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
