@@ -139,10 +139,12 @@ function deactivate(): void {
 function reflectButton(): void {
   if (!toggleBtn) return;
   toggleBtn.setAttribute('aria-pressed', String(enabled));
-  toggleBtn.textContent = enabled ? '📖 Reader: on' : '📖 Reader: off';
+  const label = enabled ? '📖 Glowlog: on' : '📖 Glowlog: off';
+  toggleBtn.textContent = label;
+  toggleBtn.setAttribute('aria-label', label);
   toggleBtn.title = enabled
-    ? 'glowficlog reader is on (Alt+G to toggle)'
-    : 'Show the glowficlog compact reader (Alt+G)';
+    ? 'Glowlog is on (Alt+G to toggle)'
+    : 'Show the Glowlog compact reader (Alt+G)';
 }
 
 function setEnabled(value: boolean, persist: boolean): void {

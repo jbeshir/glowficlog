@@ -5,6 +5,7 @@
 // Every field is null-guarded; malformed or absent markup yields nulls, never throws.
 
 import type { Post } from './types.js';
+import { renderedPostContainers } from './dom.js';
 
 /** Collapse internal whitespace and trim; return null for empty results. */
 function cleanText(node: Element | null | undefined): string | null {
@@ -48,7 +49,11 @@ export function parsePosts(root: ParentNode): readonly Post[] {
     return Object.freeze([]);
   }
 
-  const containers = Array.from(root.querySelectorAll('.post-container'));
+  // RENDERED containers only: the reader must mirror exactly the posts the page
+  // shows, so the collapsed page-2 OP (inside `.post-expander > .hidden`) is
+  // skipped while the page-1 visible OP is kept — the same set the content
+  // script hides on mount.
+  const containers = renderedPostContainers(root);
   const posts: Post[] = containers.map((container, index) => {
     const isOP = container.classList.contains('post-post');
 

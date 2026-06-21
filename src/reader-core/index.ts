@@ -14,6 +14,7 @@ export {
 } from './layout.js';
 export {
   commonAncestor,
+  renderedPostContainers,
   mountReaderInPostList,
   unmountReader,
   HIDDEN_ORIGINAL_CLASS,

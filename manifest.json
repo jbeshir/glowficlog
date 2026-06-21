@@ -11,7 +11,12 @@
   "permissions": ["storage"],
   "content_scripts": [
     {
-      "matches": ["*://glowfic.com/posts/*", "*://www.glowfic.com/posts/*"],
+      "matches": [
+        "*://glowfic.com/posts/*",
+        "*://www.glowfic.com/posts/*",
+        "*://glowfic.com/replies/*",
+        "*://www.glowfic.com/replies/*"
+      ],
       "js": ["content.js"],
       "css": ["reader.css"],
       "run_at": "document_idle"

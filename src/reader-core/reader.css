@@ -161,25 +161,29 @@
 
 /*
  * CONNECTOR — the thin horizontal stroke joining the icon box to the body band
- * (the spec's "L" laid on its side). It spans the gap between the gutter and the
- * body, overlapping each by ~2px so the (now opaque) tints fuse seamlessly, and
- * sits at the post's first-line height so it reads as emanating from the top of
- * the icon box.
+ * (the spec's "L" laid on its side). Its ICON-SIDE edge butts EXACTLY against the
+ * icon box's inner edge (the box sits `--glr-icon-pad` inside the gutter's inner
+ * edge, so that edge is at `gutter − icon-pad`) with NO gap, and its BAND-SIDE
+ * edge overlaps the band by 2px so the (opaque, same-tint) pieces fuse with no
+ * seam (Fix 5). It spans, therefore, the icon padding + the full gap + a 2px band
+ * overlap. It sits at the post's first-line height — within the icon box's
+ * vertical extent — so it reads as emanating from the icon box, identically on
+ * left/right posts and on the first post / OP (whose accent rail is a band
+ * box-shadow and never shifts the connector).
  */
 .glr-connector {
   position: absolute;
   top: calc(var(--glr-post-pad) + 0.3em);
   height: var(--glr-connector-h);
+  width: calc(var(--glr-icon-pad) + var(--glr-gap) + 2px);
   pointer-events: none;
   z-index: 0;
 }
 .glr-post--left .glr-connector {
-  left: calc(var(--glr-gutter) - 2px);
-  width: calc(var(--glr-gap) + 4px);
+  left: calc(var(--glr-gutter) - var(--glr-icon-pad));
 }
 .glr-post--right .glr-connector {
-  right: calc(var(--glr-gutter) - 2px);
-  width: calc(var(--glr-gap) + 4px);
+  right: calc(var(--glr-gutter) - var(--glr-icon-pad));
 }
 
 /*
@@ -322,15 +326,18 @@
   opacity: 0.7;
 }
 
+/* Condensed repeat identity (Fix 3): the character name on a repeat post. Plain,
+   readable text — deliberately NOT a pill and NOT a link: no background, no
+   border-radius, no link colour, so it never reads as clickable. Bold foreground
+   in the body font, marginally smaller than the first-appearance .glr-char, so it
+   stands out from body text as a quiet header while staying consistent with the
+   full name. */
 .glr-chip {
-  display: inline-block;
-  padding: 0 7px;
-  border-radius: 9px;
-  background: var(--glr-chip-bg);
-  color: var(--glr-link);
-  font-size: 0.78em;
-  font-weight: 600;
-  line-height: 1.5;
+  font-family: var(--glr-font-family);
+  color: var(--glr-fg);
+  font-weight: 700;
+  font-size: 0.95em;
+  letter-spacing: 0.01em;
 }
 
 .glr-permalink {
