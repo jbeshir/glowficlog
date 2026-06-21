@@ -6,8 +6,23 @@
 // Driven by URL query params for deterministic screenshots:
 //   ?fixture=dialogue-2author&theme=dark[&raw=1]
 
-import { parsePosts, renderReader, applyTheme, layoutIcons } from '../reader-core/index.js';
+import {
+  parsePosts,
+  renderReader,
+  applyTheme,
+  layoutIcons,
+  enableIconPreviews,
+} from '../reader-core/index.js';
 import type { FixtureMeta, ThemeVars } from '../reader-core/index.js';
+
+/** Host body typography fallback (matches reader.css / the real glowfic default
+ *  post text), applied through the SAME applyTheme so the offline preview matches
+ *  the live site. */
+const FONT_FALLBACK = {
+  fontFamily: 'Helvetica, Verdana, sans-serif',
+  fontSize: '16px',
+  lineHeight: '1.25',
+} as const;
 
 interface EmbeddedFixture {
   meta: FixtureMeta;
@@ -37,15 +52,15 @@ interface Palette {
 const PALETTES: Record<string, Palette> = {
   light: {
     dark: false,
-    vars: { bg: '#ffffff', fg: '#1b1b1f', link: '#2563eb', border: '#e3e6eb' },
+    vars: { bg: '#ffffff', fg: '#1b1b1f', link: '#2563eb', border: '#e3e6eb', ...FONT_FALLBACK },
   },
   dark: {
     dark: true,
-    vars: { bg: '#16171b', fg: '#e6e7ea', link: '#7aa2ff', border: '#2a2c33' },
+    vars: { bg: '#16171b', fg: '#e6e7ea', link: '#7aa2ff', border: '#2a2c33', ...FONT_FALLBACK },
   },
   sepia: {
     dark: false,
-    vars: { bg: '#f4ecd8', fg: '#5b4636', link: '#9a3b2f', border: '#ddcdb0' },
+    vars: { bg: '#f4ecd8', fg: '#5b4636', link: '#9a3b2f', border: '#ddcdb0', ...FONT_FALLBACK },
   },
 };
 
@@ -150,6 +165,8 @@ function labelled(text: string, control: HTMLElement): HTMLElement {
 
 /** The reader currently on screen, so the resize handler can re-flow its icons. */
 let currentReader: HTMLElement | null = null;
+/** Cleanup for the on-screen reader's icon previews; torn down on re-render. */
+let disablePreviews: (() => void) | null = null;
 
 function render(state: ViewState): void {
   writeState(state);
@@ -161,6 +178,12 @@ function render(state: ViewState): void {
   // blends into the surrounding "site" in screenshots.
   document.body.style.background = palette.vars.bg;
   document.body.style.color = palette.vars.fg;
+
+  // Tear down the previous reader's previews before we rebuild the DOM.
+  if (disablePreviews) {
+    disablePreviews();
+    disablePreviews = null;
+  }
 
   const app = document.getElementById('app');
   if (!app) return;
@@ -215,6 +238,8 @@ function render(state: ViewState): void {
 
   // Icons can only be flow-sized once the reader is laid out in the document.
   layoutIcons(reader);
+  // Smooth floating icon previews, same code path as the extension.
+  disablePreviews = enableIconPreviews(reader);
 }
 
 // Re-flow icons on resize (debounced) — post heights, and thus how far an icon

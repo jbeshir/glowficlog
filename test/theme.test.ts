@@ -90,6 +90,61 @@ test('readThemeFromDocument never throws on a bare document', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Fix 2 — host body typography sampling
+// ---------------------------------------------------------------------------
+
+test('readThemeFromDocument samples font-family/size/line-height from .post-content', () => {
+  const dom = new JSDOM(`<!DOCTYPE html><html><body>
+    <div class="post-container"><div class="post-content">text</div></div>
+  </body></html>`);
+  const doc = dom.window.document;
+  const pc = doc.querySelector('.post-content') as HTMLElement;
+  pc.style.fontFamily = 'Helvetica, Verdana, sans-serif';
+  pc.style.fontSize = '16px';
+  pc.style.lineHeight = '1.25';
+
+  const vars = readThemeFromDocument(doc);
+  assert.match(vars.fontFamily ?? '', /Helvetica/, 'font-family sampled');
+  assert.equal(vars.fontSize, '16px', 'font-size sampled');
+  assert.equal(vars.lineHeight, '1.25', 'line-height sampled');
+});
+
+test('readThemeFromDocument treats a "normal" line-height as unsampled', () => {
+  const dom = new JSDOM(`<!DOCTYPE html><html><body>
+    <div class="post-content">text</div>
+  </body></html>`);
+  const doc = dom.window.document;
+  (doc.querySelector('.post-content') as HTMLElement).style.lineHeight = 'normal';
+
+  const vars = readThemeFromDocument(doc);
+  assert.equal(vars.lineHeight, '', 'normal → empty so the reader fallback applies');
+});
+
+test('applyTheme writes the host typography vars when present', () => {
+  const { root } = freshRoot();
+  applyTheme(root, {
+    bg: '#fff',
+    fg: 'rgb(27, 27, 31)',
+    link: '#2563eb',
+    border: '#ccc',
+    fontFamily: 'Helvetica, Verdana, sans-serif',
+    fontSize: '16px',
+    lineHeight: '1.25',
+  });
+  assert.equal(root.style.getPropertyValue('--glr-font-family'), 'Helvetica, Verdana, sans-serif');
+  assert.equal(root.style.getPropertyValue('--glr-font-size'), '16px');
+  assert.equal(root.style.getPropertyValue('--glr-line-height'), '1.25');
+});
+
+test('applyTheme leaves typography vars unset when unsampled (CSS fallback survives)', () => {
+  const { root } = freshRoot();
+  applyTheme(root, { bg: '#fff', fg: 'rgb(27, 27, 31)', link: '#2563eb', border: '#ccc' });
+  assert.equal(root.style.getPropertyValue('--glr-font-family'), '', 'no font-family var written');
+  assert.equal(root.style.getPropertyValue('--glr-font-size'), '', 'no font-size var written');
+  assert.equal(root.style.getPropertyValue('--glr-line-height'), '', 'no line-height var written');
+});
+
+// ---------------------------------------------------------------------------
 // applyTheme — sets the vars + derived translucent variants
 // ---------------------------------------------------------------------------
 

@@ -12,11 +12,12 @@ import {
   readThemeFromDocument,
   applyTheme,
   layoutIcons,
-  commonAncestor,
+  mountReaderInPostList,
+  unmountReader,
+  enableIconPreviews,
 } from '../reader-core/index.js';
 
 const STORAGE_KEY = 'glowficlog:enabled';
-const HIDDEN_CLASS = 'glr-hidden-original';
 
 // ---- WebExtension API (feature-detected; no @types/chrome dependency) ----
 
@@ -69,6 +70,7 @@ async function saveEnabled(value: boolean): Promise<void> {
 // ---- Reader activation / restoration ----
 
 let readerEl: HTMLElement | null = null;
+let disablePreviews: (() => void) | null = null;
 let enabled = false;
 let toggleBtn: HTMLButtonElement | null = null;
 
@@ -90,46 +92,23 @@ function isThreadPage(): boolean {
   return document.querySelector('.post-container') !== null;
 }
 
-/** Where to insert the reader: just before the element that contains the post
- *  list (the `.post-container`s' common ancestor), so we don't assume an OP
- *  exists. Falls back to the first container's parent, or the container itself,
- *  for degenerate DOM shapes. */
-function readerAnchor(containers: readonly HTMLElement[]): HTMLElement {
-  const first = containers[0];
-  const lca = commonAncestor(containers);
-  // If the LCA *is* a post container (single post, or one nested in another),
-  // the wrapper is its parent. Otherwise the LCA already is the list wrapper.
-  const wrapper =
-    lca && !containers.includes(lca as HTMLElement)
-      ? (lca as HTMLElement)
-      : (first.parentElement ?? first);
-  // Don't reach above the body/root — that would place the reader outside the
-  // content region. Use the wrapper only when it sits inside the body.
-  if (wrapper === document.body || wrapper === document.documentElement) {
-    return first;
-  }
-  return wrapper;
-}
-
 function activate(): void {
   if (readerEl) return;
-  const containers = Array.from(document.querySelectorAll<HTMLElement>('.post-container'));
-  if (containers.length === 0) return; // selectors absent → no-op
-
   const posts = parsePosts(document);
-  if (posts.length === 0) return;
+  if (posts.length === 0) return; // selectors absent → no-op
 
   const reader = renderReader(posts, { document, theme: detectTheme() });
-  // Colours follow the host glowfic theme (read BEFORE we hide the originals,
-  // while their computed styles are still observable). Cheap, so re-read on
-  // every (re)activation rather than caching.
+  // Colours AND typography follow the host glowfic theme (read BEFORE we hide the
+  // originals, while their computed styles are still observable). Cheap, so
+  // re-read on every (re)activation rather than caching.
   applyTheme(reader, readThemeFromDocument(document));
-  const anchor = readerAnchor(containers);
-  anchor.parentNode?.insertBefore(reader, anchor);
-  // Hide each original container individually (minimal, reversible mutation that
-  // leaves sibling page chrome — pagination, headers — untouched).
-  containers.forEach((c) => c.classList.add(HIDDEN_CLASS));
+  // Insert the reader at the post list's position — between the top and bottom
+  // paginators — and hide only the post containers (paginators stay). Bail out
+  // untouched if there are no containers to anchor to.
+  if (!mountReaderInPostList(reader, document)) return;
   readerEl = reader;
+  // Smooth floating icon previews (cleaned up on deactivate).
+  disablePreviews = enableIconPreviews(reader);
   // Icons can only be flow-sized once the reader is in a laid-out document.
   layoutIcons(reader);
 }
@@ -146,14 +125,15 @@ function onResize(): void {
 }
 
 function deactivate(): void {
-  if (readerEl) {
-    readerEl.remove();
-    readerEl = null;
+  // Tear down the floating previews before the reader goes away.
+  if (disablePreviews) {
+    disablePreviews();
+    disablePreviews = null;
   }
-  // Restore every host post we hid (fully reverts our only DOM mutation).
-  document
-    .querySelectorAll<HTMLElement>('.' + HIDDEN_CLASS)
-    .forEach((c) => c.classList.remove(HIDDEN_CLASS));
+  // Remove the reader and unhide every host post we hid — fully reverts our DOM
+  // mutations so the page is exactly as it was.
+  unmountReader(readerEl, document);
+  readerEl = null;
 }
 
 function reflectButton(): void {

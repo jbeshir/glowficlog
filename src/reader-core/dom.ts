@@ -33,3 +33,57 @@ function lowestCommonAncestorPair(a: Element, b: Element): Element | null {
   }
   return null;
 }
+
+/** Class applied to the host's `.post-container`s to hide them while the reader
+ *  is up. Removing it restores the page exactly. */
+export const HIDDEN_ORIGINAL_CLASS = 'glr-hidden-original';
+
+/**
+ * Mount `reader` at the post list's position and hide the host posts.
+ *
+ * A glowfic thread page is `…[.paginator (top)] [.post-container …] [.paginator
+ * (bottom)]…`: the post containers sit BETWEEN two `.paginator` nav bars. The
+ * reader must take the post list's place, so it is inserted immediately before
+ * the FIRST `.post-container` within that container's own parent
+ * (`firstPost.parentElement.insertBefore(reader, firstPost)`) — which lands it
+ * between the top and bottom paginators. Only `.post-container` elements are then
+ * hidden; the `.paginator` bars (and every other sibling) are left untouched.
+ *
+ * `commonAncestor` is consulted ONLY as a sanity check that the containers form a
+ * single list; insertion is always anchored to the first container's position so
+ * the reader works on page 2+ (which has no OP) exactly as on page 1.
+ *
+ * Returns the inserted `reader` on success, or `null` when there are no
+ * containers / the first has no parent (caller then leaves the page untouched).
+ * Never throws.
+ */
+export function mountReaderInPostList(
+  reader: HTMLElement,
+  doc: Document,
+): HTMLElement | null {
+  const containers = Array.from(doc.querySelectorAll<HTMLElement>('.post-container'));
+  if (containers.length === 0) return null;
+  const first = containers[0];
+  const parent = first.parentElement;
+  if (!parent) return null;
+  // Sanity check only — the containers should share a wrapper for "the post
+  // list's position" to be well-defined. We anchor to `first` regardless.
+  commonAncestor(containers);
+  parent.insertBefore(reader, first);
+  // Hide ONLY the post containers — never the surrounding paginators/chrome.
+  for (const c of containers) c.classList.add(HIDDEN_ORIGINAL_CLASS);
+  return reader;
+}
+
+/**
+ * Reverse {@link mountReaderInPostList}: remove the reader (if any) and unhide
+ * every post we hid, restoring the host DOM to its pre-mount state. Never throws.
+ */
+export function unmountReader(reader: HTMLElement | null, doc: Document): void {
+  if (reader) reader.remove();
+  for (const c of Array.from(
+    doc.querySelectorAll<HTMLElement>('.' + HIDDEN_ORIGINAL_CLASS),
+  )) {
+    c.classList.remove(HIDDEN_ORIGINAL_CLASS);
+  }
+}

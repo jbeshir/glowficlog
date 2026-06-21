@@ -12,4 +12,10 @@ export {
   DEFAULT_ICON_OPTS,
   DEFAULT_ICON_PAD,
 } from './layout.js';
-export { commonAncestor } from './dom.js';
+export {
+  commonAncestor,
+  mountReaderInPostList,
+  unmountReader,
+  HIDDEN_ORIGINAL_CLASS,
+} from './dom.js';
+export { enableIconPreviews } from './previews.js';

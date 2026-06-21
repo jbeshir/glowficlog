@@ -137,12 +137,9 @@ function buildArm(
     img.title = title;
     img.loading = 'lazy';
     img.decoding = 'async';
-    // Full-size hover preview (CSS reveals it on hover/focus).
-    const pop = el(doc, 'img', `${NS}-icon-pop`) as HTMLImageElement;
-    pop.src = post.iconUrl;
-    pop.alt = '';
-    pop.setAttribute('aria-hidden', 'true');
-    pop.loading = 'lazy';
+    // The full-size hover preview is a single floating element managed by
+    // enableIconPreviews() (Fix 5) — not a per-post node — so it doesn't bloat
+    // the markup or get clipped by an ancestor's overflow.
     // Broken/blocked icons (and offline screenshots) degrade to the monogram.
     // Set as a property (not an attribute) so it never appears in serialized
     // markup — renderReader stays deterministic across identical inputs.
@@ -150,7 +147,6 @@ function buildArm(
       box.replaceChildren(buildMonogram(doc, post, title));
     };
     box.appendChild(img);
-    box.appendChild(pop);
   } else {
     box.appendChild(buildMonogram(doc, post, title));
   }

@@ -21,8 +21,12 @@
   --glr-icon-pad: 8px;         /* symmetric padding around the icon in its tinted box (Req 1) */
   --glr-connector-h: 12px;     /* thickness of the thin icon→body connector (Req 1) */
   --glr-radius: 12px;          /* rounding of the icon box and the body rectangle */
-  --glr-body-size: 15.5px;     /* comfortable body font-size (Req 4) */
-  --glr-measure: 72ch;         /* readable measure even when the card is wider (Req 4) */
+
+  /* body typography — host-sampled by applyTheme; these are the fallbacks for
+     the harness / when the host could not be sampled (Fix 2). */
+  --glr-font-family: Helvetica, Verdana, sans-serif;
+  --glr-font-size: 16px;
+  --glr-line-height: 1.25;
 
   /* icon sizing tunables (read by layoutIcons) */
   --glr-icon-min: 28px;        /* floor ≈ one line height: dense runs stay tiny */
@@ -50,9 +54,10 @@
   padding: 12px 0 48px;
   background: var(--glr-bg);
   color: var(--glr-fg);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-size: 15px;
-  line-height: 1.5;
+  /* Match the host post typography (Fix 2). */
+  font-family: var(--glr-font-family);
+  font-size: var(--glr-font-size);
+  line-height: var(--glr-line-height);
 }
 
 /* Fallback dark palette for when applyTheme isn't driving the colours. */
@@ -112,13 +117,26 @@
  * Stripe tints. The BAND, CONNECTOR and ARM all carry the post's tint so the
  * icon box + connector + body read as ONE region; the article keeps the stripe
  * class purely as a DOM data hook.
+ *
+ * The tint is the translucent stripe composited OVER an opaque copy of the host
+ * background (`linear-gradient(stripe,stripe), var(--glr-bg)`), making each piece
+ * fully OPAQUE while looking identical to a bare translucent overlay on the
+ * reader's bg. Because the pieces are opaque and share the exact same colour, the
+ * ~1px overlaps where the connector meets the icon box and the body band neither
+ * double in alpha (no dark seam) nor leave a sub-pixel gap (no light seam) — the
+ * join is seamless in light and dark. (color-mix would be cleaner but isn't safe
+ * on the chrome100 build target.)
  */
 .glr-band.glr-stripe-a,
 .glr-connector.glr-stripe-a,
-.glr-arm.glr-stripe-a { background: var(--glr-stripe-a); }
+.glr-arm.glr-stripe-a {
+  background: linear-gradient(var(--glr-stripe-a), var(--glr-stripe-a)), var(--glr-bg);
+}
 .glr-band.glr-stripe-b,
 .glr-connector.glr-stripe-b,
-.glr-arm.glr-stripe-b { background: var(--glr-stripe-b); }
+.glr-arm.glr-stripe-b {
+  background: linear-gradient(var(--glr-stripe-b), var(--glr-stripe-b)), var(--glr-bg);
+}
 
 /*
  * BAND — the post's text body rectangle (the spec's large rectangle). It covers
@@ -144,8 +162,9 @@
 /*
  * CONNECTOR — the thin horizontal stroke joining the icon box to the body band
  * (the spec's "L" laid on its side). It spans the gap between the gutter and the
- * body, overlapping each by ~1px so the join is seamless, and sits at the post's
- * first-line height so it reads as emanating from the top of the icon box.
+ * body, overlapping each by ~2px so the (now opaque) tints fuse seamlessly, and
+ * sits at the post's first-line height so it reads as emanating from the top of
+ * the icon box.
  */
 .glr-connector {
   position: absolute;
@@ -155,12 +174,12 @@
   z-index: 0;
 }
 .glr-post--left .glr-connector {
-  left: calc(var(--glr-gutter) - 1px);
-  width: calc(var(--glr-gap) + 2px);
+  left: calc(var(--glr-gutter) - 2px);
+  width: calc(var(--glr-gap) + 4px);
 }
 .glr-post--right .glr-connector {
-  right: calc(var(--glr-gutter) - 1px);
-  width: calc(var(--glr-gap) + 2px);
+  right: calc(var(--glr-gutter) - 2px);
+  width: calc(var(--glr-gap) + 4px);
 }
 
 /*
@@ -187,8 +206,8 @@
 /*
  * Icon box: the square picture/monogram inside the padded arm. layoutIcons
  * writes its width/height (cap-primary, shrinking only to avoid same-side
- * overlap); until then it shows at the CSS min size. position:relative anchors
- * the hover preview.
+ * overlap); until then it shows at the CSS min size. (The hover preview is a
+ * separate floating element appended to <body>; see .glr-icon-preview.)
  */
 .glr-icon-box {
   position: relative;
@@ -223,27 +242,37 @@
   user-select: none;
 }
 
-/* Full-size hover/focus preview, escaping the (small) box. */
-.glr-icon-pop {
-  position: absolute;
+/*
+ * Full-size hover/focus preview (Fix 5). A SINGLE floating element is created by
+ * enableIconPreviews() and appended to <body> — NOT nested in the reader — so no
+ * ancestor `overflow` can clip it and showing it causes no layout shift. It is
+ * `position: fixed` with a very high z-index, positioned next to the hovered icon
+ * by JS, and fades in/out via opacity (a tiny show delay debounces flicker). The
+ * JS copies the reader's --glr-bg / --glr-pop-shadow onto it so it themes
+ * correctly despite living outside the reader subtree. Skipped for monograms.
+ */
+.glr-icon-preview {
+  position: fixed;
   top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  display: none;
-  width: 110px;
-  max-width: none;
-  height: auto;
-  z-index: 50;
+  left: 0;
+  z-index: 2147483646;
+  margin: 0;
   padding: 4px;
-  border-radius: 8px;
-  background: var(--glr-bg);
-  box-shadow: 0 6px 24px var(--glr-pop-shadow);
+  border-radius: 10px;
+  background: var(--glr-bg, #ffffff);
+  box-shadow: 0 8px 30px var(--glr-pop-shadow, rgba(0, 0, 0, 0.35));
+  opacity: 0;
+  transition: opacity 0.12s ease;
   pointer-events: none;
 }
 
-.glr-icon-box:hover .glr-icon-pop,
-.glr-icon-box:focus-within .glr-icon-pop {
+.glr-icon-preview.glr-icon-preview--visible {
+  opacity: 1;
+}
+
+.glr-icon-preview img {
   display: block;
+  border-radius: 6px;
 }
 
 /* Text body. Positioned so it paints ABOVE its post's translucent band; the
@@ -315,14 +344,15 @@
   color: var(--glr-link);
 }
 
-/* Body typography (Req 4): full foreground colour, comfortable size/leading, and
-   a capped measure so the wide card stays readable. The body rectangle can be
-   wider than the text; only the line length is bounded by --glr-measure. */
+/* Body typography (Fix 2 + Fix 3): full foreground colour and the host-sampled
+   font/size/leading. There is NO inner measure cap — the text fills the post
+   card's content box edge-to-edge (inset only by the card's --glr-post-pad), so
+   the text width matches the post borders with no left-aligned dead space. */
 .glr-content {
   color: var(--glr-fg);
-  font-size: var(--glr-body-size);
-  line-height: 1.6;
-  max-width: var(--glr-measure);
+  font-family: var(--glr-font-family);
+  font-size: var(--glr-font-size);
+  line-height: var(--glr-line-height);
   word-wrap: break-word;
   overflow-wrap: break-word;
 }

@@ -21,6 +21,12 @@ export interface ThemeVars {
   readonly link: string;
   /** Border / separator base colour. */
   readonly border: string;
+  /** Body text font-family (host `.post-content`), or '' / absent when unsampled. */
+  readonly fontFamily?: string;
+  /** Body text font-size, e.g. "16px", or '' / absent when unsampled. */
+  readonly fontSize?: string;
+  /** Body text line-height (computed px or unitless), or '' / absent when unsampled. */
+  readonly lineHeight?: string;
 }
 
 /** Parse `rgb()`, `rgba()`, `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa` into RGBA. */
@@ -99,6 +105,9 @@ function computedStyleFor(doc: Document): ((el: Element) => CSSStyleDeclaration)
  * - **link**: colour of an `<a>` inside a post, else any `<a>`, else `body`.
  * - **border**: border colour of `.post-container` / `.post-footer`, else a
  *   translucent derivation of fg.
+ * - **fontFamily / fontSize / lineHeight**: the body text typography of
+ *   `.post-content` (fallback `body`), so the reader's body text matches the
+ *   host's exactly.
  *
  * Never throws; unreadable fields come back as `''`.
  */
@@ -121,9 +130,22 @@ export function readThemeFromDocument(doc: Document): ThemeVars {
     if (!isTransparent(c)) bg = c;
   }
 
-  // Foreground text.
+  // Foreground text + body typography, sampled from the same element so the
+  // reader's body text matches the host post text exactly.
   const fgEl = doc.querySelector('.post-content') ?? body;
   const fg = fgEl ? gcs(fgEl).color : '';
+  let fontFamily = '';
+  let fontSize = '';
+  let lineHeight = '';
+  if (fgEl) {
+    const ts = gcs(fgEl);
+    fontFamily = ts.fontFamily || '';
+    fontSize = ts.fontSize || '';
+    // Computed line-height is often `normal` when unset; treat that as unsampled
+    // so the reader's own readable fallback applies rather than the host default.
+    const lh = ts.lineHeight || '';
+    lineHeight = lh && lh.toLowerCase() !== 'normal' ? lh : '';
+  }
 
   // Link / accent.
   const linkEl =
@@ -143,7 +165,7 @@ export function readThemeFromDocument(doc: Document): ThemeVars {
   }
   if (!border && fg && !isTransparent(fg)) border = withAlpha(fg, 0.2);
 
-  return { bg, fg, link, border };
+  return { bg, fg, link, border, fontFamily, fontSize, lineHeight };
 }
 
 /**
@@ -154,6 +176,9 @@ export function readThemeFromDocument(doc: Document): ThemeVars {
  *   `--glr-chip-bg`   link @ 0.16 (name-chip + first-appearance accent wash)
  *   `--glr-stripe-a`  fg @ 0.045 (subtle L-block tint, even posts)
  *   `--glr-stripe-b`  fg @ 0.09  (subtle L-block tint, odd posts)
+ *
+ * It also sets the host body typography (`--glr-font-family`, `--glr-font-size`,
+ * `--glr-line-height`) when sampled, so the reader's body text matches the host.
  *
  * The two stripes are low-alpha overlays of the host FOREGROUND, so they lift
  * off the host background on both light and dark themes (a dark page's fg is
@@ -170,6 +195,12 @@ export function applyTheme(rootEl: HTMLElement, vars: ThemeVars): void {
   set('--glr-fg', vars.fg);
   set('--glr-link', vars.link);
   set('--glr-border', vars.border);
+
+  // Body typography sampled from the host post text (skipped when unsampled, so
+  // reader.css's Helvetica,Verdana,sans-serif / 16px / 1.25 fallback shows).
+  set('--glr-font-family', vars.fontFamily ?? '');
+  set('--glr-font-size', vars.fontSize ?? '');
+  set('--glr-line-height', vars.lineHeight ?? '');
 
   if (vars.fg && !isTransparent(vars.fg)) {
     set('--glr-muted', withAlpha(vars.fg, 0.65));
