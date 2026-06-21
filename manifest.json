@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "glowficlog",
+  "version": "1.0.0",
+  "description": "Reformats glowfic.com threads into a compact, high-information-density reader view.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "matches": ["*://glowfic.com/posts/*"],
+      "js": ["content.js"],
+      "css": ["reader.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "glowficlog@glowficlog.local",
+      "strict_min_version": "115.0"
+    }
+  }
+}

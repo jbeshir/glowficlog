@@ -1,0 +1,28 @@
+{
+  "name": "glowficlog",
+  "version": "1.0.0",
+  "description": "Browser extension that reformats glowfic.com threads into a compact, high-information-density reader view, plus an offline dev harness sharing the same renderer.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:ext": "web-ext lint --source-dir dist --self-hosted",
+    "test": "tsx --test test/*.test.ts",
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs --dev",
+    "validate": "npm run typecheck && npm run lint && npm run test && npm run build && npm run lint:ext",
+    "package": "node scripts/package.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "@types/node": "^22.10.5",
+    "esbuild": "^0.24.2",
+    "eslint": "^9.18.0",
+    "jsdom": "^25.0.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.20.0",
+    "web-ext": "^8.3.0"
+  }
+}

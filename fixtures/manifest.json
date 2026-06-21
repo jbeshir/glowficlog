@@ -1,0 +1,72 @@
+[
+  {
+    "name": "dialogue-2author",
+    "file": "dialogue-2author.html",
+    "sourceUrl": "https://glowfic.com/posts/54226?view=flat",
+    "view": "flat",
+    "postCount": 40,
+    "distinctAuthors": 2,
+    "distinctCharacters": 2,
+    "hasIconlessPosts": false,
+    "hasAuthorOnlyPosts": false,
+    "avgPostChars": 61,
+    "category": "dialogue-2author",
+    "notes": "Thread 54226; 2 authors exchanging short replies"
+  },
+  {
+    "name": "multi-author-3plus",
+    "file": "multi-author-3plus.html",
+    "sourceUrl": "https://glowfic.com/posts/60366?view=flat",
+    "view": "flat",
+    "postCount": 40,
+    "distinctAuthors": 3,
+    "distinctCharacters": 9,
+    "hasIconlessPosts": true,
+    "hasAuthorOnlyPosts": true,
+    "avgPostChars": 196,
+    "category": "multi-author-3plus",
+    "notes": "Thread 60366; 3 distinct authors"
+  },
+  {
+    "name": "icon-heavy",
+    "file": "icon-heavy.html",
+    "sourceUrl": "https://glowfic.com/posts/54226?per_page=100&page=1",
+    "view": "paginated",
+    "postCount": 30,
+    "distinctAuthors": 2,
+    "distinctCharacters": 5,
+    "hasIconlessPosts": false,
+    "hasAuthorOnlyPosts": false,
+    "avgPostChars": 334,
+    "category": "icon-heavy",
+    "notes": "Thread 54226; 100% posts have icons; 30 unique icon srcs; paginated view with <a>-wrapped authors"
+  },
+  {
+    "name": "mixed-iconless",
+    "file": "mixed-iconless.html",
+    "sourceUrl": "https://glowfic.com/posts/57823?view=flat",
+    "view": "flat",
+    "postCount": 40,
+    "distinctAuthors": 2,
+    "distinctCharacters": 2,
+    "hasIconlessPosts": true,
+    "hasAuthorOnlyPosts": true,
+    "avgPostChars": 748,
+    "category": "mixed-iconless",
+    "notes": "Thread 57823; 18 iconless posts, 18 author-only (spacer-alt)"
+  },
+  {
+    "name": "long-infodump",
+    "file": "long-infodump.html",
+    "sourceUrl": "https://glowfic.com/posts/57823?view=flat",
+    "view": "flat",
+    "postCount": 39,
+    "distinctAuthors": 2,
+    "distinctCharacters": 3,
+    "hasIconlessPosts": true,
+    "hasAuthorOnlyPosts": true,
+    "avgPostChars": 1581,
+    "category": "long-infodump",
+    "notes": "Thread 57823; 29 posts >800 chars; avg 1581 chars"
+  }
+]

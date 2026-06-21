@@ -1,0 +1,15 @@
+# dependencies (provided pre-installed; never committed)
+node_modules/
+package-lock.json
+
+# build output
+dist/
+web-ext-artifacts/
+*.zip
+
+# generated
+src/dev/fixtures.generated.ts
+
+# os / editor
+.DS_Store
+*.log
