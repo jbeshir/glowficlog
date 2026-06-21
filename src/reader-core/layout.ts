@@ -63,6 +63,119 @@ function readPx(style: CSSStyleDeclaration, name: string, fallback: number): num
   return Number.isFinite(v) ? v : fallback;
 }
 
+// ---------------------------------------------------------------------------
+// Single-line body detection (drives icon-side body alignment)
+// ---------------------------------------------------------------------------
+
+/**
+ * Slack allowed on top of one line height before a body counts as multi-line.
+ * One line of text occupies ~1× the line height; 1.6× comfortably clears a
+ * single line's descenders/leading yet stays well below the ~2× a wrapped second
+ * line would add, so the threshold cleanly separates one line from two.
+ */
+export const SINGLE_LINE_FACTOR = 1.6;
+
+/** Width-independent inputs for {@link isSingleLine}. */
+export interface SingleLineInput {
+  /** Measured rendered height of the `.glr-content` box, px. */
+  readonly heightPx: number;
+  /** Resolved line height of that box, px (see {@link resolveLineHeightPx}). */
+  readonly lineHeightPx: number;
+  /** Number of BLOCK-LEVEL element children of the content box. */
+  readonly blockChildCount: number;
+}
+
+/**
+ * PURE decision: does a post body render as a single, non-wrapping visual line?
+ *
+ * Robust against the naive `Range.getClientRects()` trap (a single `<p>` yields
+ * the block's own rect PLUS its text-line rect ~1px apart, which a distinct-top
+ * count would miscount as two): instead we compare the measured CONTENT height
+ * to the line height. A body is single-line iff it has AT MOST ONE block-level
+ * child AND its height fits within {@link SINGLE_LINE_FACTOR} line heights.
+ *
+ * - `blockChildCount > 1` → multiple stacked blocks → never single-line.
+ * - `heightPx <= 0` (empty body) → treated as single-line (aligning an empty
+ *   body is a no-op, so this is the harmless, stable choice).
+ * - non-positive `lineHeightPx` (couldn't resolve) with real height → NOT
+ *   single-line, the conservative default that leaves the body left-aligned.
+ *
+ * No DOM, no globals: just numbers in, boolean out.
+ */
+export function isSingleLine(input: SingleLineInput): boolean {
+  const { heightPx, lineHeightPx, blockChildCount } = input;
+  if (blockChildCount > 1) return false;
+  if (heightPx <= 0) return true; // empty body → no visible effect either way
+  if (!(lineHeightPx > 0)) return false; // can't measure a line → stay left
+  return heightPx <= lineHeightPx * SINGLE_LINE_FACTOR;
+}
+
+/**
+ * Resolve a content box's used line height to px from its computed style,
+ * handling the three forms `line-height` can take: `normal` (≈1.2 × font-size),
+ * a unitless multiplier (e.g. `1.25` → multiplier × font-size), and an absolute
+ * `px` length. Falls back to 1.2 × font-size when the value is unparseable.
+ */
+export function resolveLineHeightPx(style: CSSStyleDeclaration): number {
+  const fontSize = Number.parseFloat(style.fontSize) || 16;
+  const raw = (style.lineHeight || '').trim();
+  if (!raw || raw === 'normal') return fontSize * 1.2;
+  const num = Number.parseFloat(raw);
+  if (!Number.isFinite(num)) return fontSize * 1.2;
+  if (raw.endsWith('px')) return num;
+  if (/^[0-9.]+$/.test(raw)) return num * fontSize; // unitless multiplier
+  return num; // any other unit already in px-ish length; use the number
+}
+
+/** Count an element's BLOCK-LEVEL element children (inline-ish/none excluded). */
+const INLINE_DISPLAYS = new Set([
+  'inline',
+  'inline-block',
+  'inline-flex',
+  'inline-grid',
+  'contents',
+  'none',
+]);
+function countBlockChildren(content: HTMLElement, win: Window | null): number {
+  let n = 0;
+  for (const child of Array.from(content.children)) {
+    if (win?.getComputedStyle) {
+      if (!INLINE_DISPLAYS.has(win.getComputedStyle(child).display)) n++;
+    } else {
+      n++; // can't measure display → assume block (conservative: more likely multi)
+    }
+  }
+  return n;
+}
+
+/**
+ * Layout-time pass: for every `.glr-post`, decide whether its `.glr-content`
+ * body is a single visual line and toggle `glr-body--single` on the post
+ * accordingly. CSS then right-aligns ONLY right-gutter single-line bodies
+ * (`.glr-post--right.glr-body--single .glr-content`); everything else stays
+ * left. Width-dependent (wrapping changes with viewport width), so it must run
+ * after insert AND on the debounced resize, alongside {@link layoutIcons}.
+ *
+ * Idempotent and safe to call repeatedly.
+ */
+export function markSingleLineBodies(root: HTMLElement): void {
+  const win = root.ownerDocument?.defaultView ?? null;
+  const posts = root.querySelectorAll<HTMLElement>('.glr-post');
+  for (const post of Array.from(posts)) {
+    const content = post.querySelector<HTMLElement>('.glr-content');
+    let single = false;
+    if (content) {
+      const blockChildCount = countBlockChildren(content, win);
+      const lineHeightPx = win?.getComputedStyle
+        ? resolveLineHeightPx(win.getComputedStyle(content))
+        : 0;
+      const heightPx = content.getBoundingClientRect().height;
+      single = isSingleLine({ heightPx, lineHeightPx, blockChildCount });
+    }
+    post.classList.toggle('glr-body--single', single);
+  }
+}
+
 /**
  * Measure-and-apply pass. For each gutter side, collect that side's posts in
  * document order, read each post's `offsetTop` (relative to the positioned

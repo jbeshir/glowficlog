@@ -5,10 +5,14 @@ export { parsePosts } from './parse.js';
 export { renderReader } from './render.js';
 export type { ThemeVars } from './theme.js';
 export { readThemeFromDocument, applyTheme, withAlpha, isTransparent } from './theme.js';
-export type { IconSizeOpts } from './layout.js';
+export type { IconSizeOpts, SingleLineInput } from './layout.js';
 export {
   computeIconSizes,
   layoutIcons,
+  markSingleLineBodies,
+  isSingleLine,
+  resolveLineHeightPx,
+  SINGLE_LINE_FACTOR,
   DEFAULT_ICON_OPTS,
   DEFAULT_ICON_PAD,
 } from './layout.js';

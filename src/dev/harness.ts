@@ -11,6 +11,7 @@ import {
   renderReader,
   applyTheme,
   layoutIcons,
+  markSingleLineBodies,
   enableIconPreviews,
 } from '../reader-core/index.js';
 import type { FixtureMeta, ThemeVars } from '../reader-core/index.js';
@@ -238,6 +239,8 @@ function render(state: ViewState): void {
 
   // Icons can only be flow-sized once the reader is laid out in the document.
   layoutIcons(reader);
+  // Same single-line body alignment pass the content script runs after insert.
+  markSingleLineBodies(reader);
   // Smooth floating icon previews, same code path as the extension.
   disablePreviews = enableIconPreviews(reader);
 }
@@ -249,7 +252,11 @@ globalThis.addEventListener?.('resize', () => {
   if (resizeTimer !== null) clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
     resizeTimer = null;
-    if (currentReader) layoutIcons(currentReader);
+    if (currentReader) {
+      layoutIcons(currentReader);
+      // Width changed → re-evaluate which bodies are single-line (wrap/unwrap).
+      markSingleLineBodies(currentReader);
+    }
   }, 120);
 });
 

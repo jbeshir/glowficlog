@@ -12,6 +12,7 @@ import {
   readThemeFromDocument,
   applyTheme,
   layoutIcons,
+  markSingleLineBodies,
   mountReaderInPostList,
   unmountReader,
   enableIconPreviews,
@@ -111,6 +112,9 @@ function activate(): void {
   disablePreviews = enableIconPreviews(reader);
   // Icons can only be flow-sized once the reader is in a laid-out document.
   layoutIcons(reader);
+  // Decide per-post single-line body alignment once the body has a measured
+  // height (right-gutter single-line bodies right-align; everything else left).
+  markSingleLineBodies(reader);
 }
 
 // Post heights — and therefore how far an icon may grow before meeting the next
@@ -120,7 +124,11 @@ function onResize(): void {
   if (resizeTimer !== null) clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
     resizeTimer = null;
-    if (readerEl) layoutIcons(readerEl);
+    if (readerEl) {
+      layoutIcons(readerEl);
+      // Width changed → bodies may wrap/unwrap, so re-evaluate single-line state.
+      markSingleLineBodies(readerEl);
+    }
   }, 120);
 }
 

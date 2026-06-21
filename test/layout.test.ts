@@ -8,6 +8,9 @@ import { JSDOM } from 'jsdom';
 import {
   computeIconSizes,
   layoutIcons,
+  markSingleLineBodies,
+  isSingleLine,
+  SINGLE_LINE_FACTOR,
   renderReader,
   parsePosts,
   DEFAULT_ICON_OPTS,
@@ -220,6 +223,134 @@ test('broken icon image falls back to the monogram on error', () => {
   const mono = box.querySelector('.glr-icon-mono');
   assert.ok(mono, 'monogram inserted in its place');
   assert.ok((mono!.textContent ?? '').length > 0, 'monogram shows an initial');
+});
+
+// ---------------------------------------------------------------------------
+// isSingleLine — pure single-line decision (width-independent)
+// ---------------------------------------------------------------------------
+
+test('isSingleLine: one short line (single block child) → true', () => {
+  // A single <p> ~one line tall: height fits within the line-height tolerance.
+  assert.equal(
+    isSingleLine({ heightPx: 20, lineHeightPx: 20, blockChildCount: 1 }),
+    true,
+  );
+});
+
+test('isSingleLine: a wrapped second line → false', () => {
+  // Same one-block body but ~two lines tall (40px) → exceeds 1.6 × line height.
+  assert.equal(
+    isSingleLine({ heightPx: 40, lineHeightPx: 20, blockChildCount: 1 }),
+    false,
+  );
+});
+
+test('isSingleLine: multiple block children → false even if short', () => {
+  // Two stacked blocks are never one visual line, regardless of measured height.
+  assert.equal(
+    isSingleLine({ heightPx: 18, lineHeightPx: 20, blockChildCount: 2 }),
+    false,
+  );
+});
+
+test('isSingleLine: zero block children, inline-only one-line body → true', () => {
+  assert.equal(
+    isSingleLine({ heightPx: 19, lineHeightPx: 20, blockChildCount: 0 }),
+    true,
+  );
+});
+
+test('isSingleLine: exactly at the tolerance boundary is single; just past is not', () => {
+  const lh = 20;
+  const edge = lh * SINGLE_LINE_FACTOR; // 32
+  assert.equal(isSingleLine({ heightPx: edge, lineHeightPx: lh, blockChildCount: 1 }), true);
+  assert.equal(
+    isSingleLine({ heightPx: edge + 0.5, lineHeightPx: lh, blockChildCount: 1 }),
+    false,
+  );
+});
+
+test('isSingleLine: the block+line ~1px double-rect trap does NOT fool it', () => {
+  // The naive distinct-top count miscounts a single <p> as 2 lines because the
+  // block rect and its text-line rect differ by ~1px. Height-vs-line-height is
+  // immune: a one-line <p> measuring 21px against a 20px line is still single.
+  assert.equal(
+    isSingleLine({ heightPx: 21, lineHeightPx: 20, blockChildCount: 1 }),
+    true,
+  );
+});
+
+test('isSingleLine: empty body (zero height) → treated as single (no-op align)', () => {
+  assert.equal(isSingleLine({ heightPx: 0, lineHeightPx: 20, blockChildCount: 0 }), true);
+});
+
+test('isSingleLine: unmeasurable line height with real height → false (stay left)', () => {
+  assert.equal(isSingleLine({ heightPx: 20, lineHeightPx: 0, blockChildCount: 1 }), false);
+});
+
+// ---------------------------------------------------------------------------
+// markSingleLineBodies — DOM pass toggling .glr-body--single
+// ---------------------------------------------------------------------------
+
+/** Patch jsdom (which does no layout) so the pass sees deterministic geometry:
+ *  a fixed computed line-height/display and a per-content rect height. */
+function withMockedMeasure(
+  reader: HTMLElement,
+  win: Window & typeof globalThis,
+  heightFor: (content: HTMLElement, i: number) => number,
+): void {
+  win.getComputedStyle = ((elTarget: Element) => {
+    const tag = elTarget.tagName;
+    const display = tag === 'SPAN' || tag === 'A' || tag === 'EM' ? 'inline' : 'block';
+    return { fontSize: '16px', lineHeight: '20px', display } as CSSStyleDeclaration;
+  }) as typeof win.getComputedStyle;
+  Array.from(reader.querySelectorAll<HTMLElement>('.glr-content')).forEach((content, i) => {
+    content.getBoundingClientRect = () =>
+      ({ height: heightFor(content, i) }) as DOMRect;
+  });
+}
+
+test('markSingleLineBodies: short one-line body gets the class; tall body does not', () => {
+  const { dom, reader } = readerWithPosts(2);
+  const win = dom.window as unknown as Window & typeof globalThis;
+  // Post 0 → one line (18px ≤ 32); post 1 → wrapped (50px > 32).
+  withMockedMeasure(reader, win, (_c, i) => (i === 0 ? 18 : 50));
+
+  markSingleLineBodies(reader);
+
+  const posts = Array.from(reader.querySelectorAll<HTMLElement>('.glr-post'));
+  assert.ok(posts[0].classList.contains('glr-body--single'), 'short body marked single');
+  assert.ok(!posts[1].classList.contains('glr-body--single'), 'tall body not marked');
+});
+
+test('markSingleLineBodies: re-run after a wrap drops the class (resize behaviour)', () => {
+  const { dom, reader } = readerWithPosts(1);
+  const win = dom.window as unknown as Window & typeof globalThis;
+  const post = reader.querySelector('.glr-post') as HTMLElement;
+
+  // Wide: body is one line → marked.
+  withMockedMeasure(reader, win, () => 18);
+  markSingleLineBodies(reader);
+  assert.ok(post.classList.contains('glr-body--single'), 'single before narrowing');
+
+  // Narrow: same body now wraps to two lines → class must drop.
+  withMockedMeasure(reader, win, () => 40);
+  markSingleLineBodies(reader);
+  assert.ok(!post.classList.contains('glr-body--single'), 'class dropped after wrap');
+});
+
+test('markSingleLineBodies: multiple block children stays unmarked even when short', () => {
+  const { dom, reader } = readerWithPosts(1);
+  const win = dom.window as unknown as Window & typeof globalThis;
+  const content = reader.querySelector('.glr-content') as HTMLElement;
+  // Give the body a second block child (two <p>s) — never one visual line.
+  content.appendChild(dom.window.document.createElement('p')).textContent = 'second';
+  withMockedMeasure(reader, win, () => 18); // short, but two blocks
+  markSingleLineBodies(reader);
+  assert.ok(
+    !(reader.querySelector('.glr-post') as HTMLElement).classList.contains('glr-body--single'),
+    'two block children → not single',
+  );
 });
 
 test('iconless post renders a monogram, not an img', () => {

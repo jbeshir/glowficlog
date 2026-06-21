@@ -301,8 +301,12 @@
   justify-content: flex-end;
 }
 
-/* Right-gutter posts: right-align the body text too, so it sits under the icon. */
-.glr-post--right .glr-content {
+/* Right-gutter posts whose body renders as a SINGLE non-wrapping line right-align
+   the body too, so the one short line sits under its icon. Multi-line bodies (or
+   any left-gutter body) stay left-aligned. The `glr-body--single` hook is toggled
+   per post by markSingleLineBodies() at layout time (after insert and on resize),
+   so this is the ONLY rule that right-aligns a body. */
+.glr-post--right.glr-body--single .glr-content {
   text-align: right;
 }
 
