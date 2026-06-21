@@ -1,16 +1,17 @@
-// Tests for the icon flow-sizing: the pure core (computeIconSizes) exhaustively,
-// and the DOM pass (layoutIcons) against a jsdom reader with mocked offsetTop.
+// Tests for the icon sizing: the pure core (computeIconSizes) exhaustively, and
+// the DOM pass (layoutIcons) against a jsdom reader with mocked offsetTop. The
+// box is COMPACT (icon + padding); there is no flowing arm segment.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 
 import {
-  computeIconSegments,
   computeIconSizes,
   layoutIcons,
   renderReader,
   parsePosts,
   DEFAULT_ICON_OPTS,
+  DEFAULT_ICON_PAD,
 } from '../src/reader-core/index.js';
 
 const OPTS = { min: 26, cap: 100, gap: 8 };
@@ -83,44 +84,14 @@ test('DEFAULT_ICON_OPTS are within the spec ranges', () => {
   assert.ok(DEFAULT_ICON_OPTS.min >= 24 && DEFAULT_ICON_OPTS.min <= 28, 'min ≈ one line height');
   assert.ok(DEFAULT_ICON_OPTS.cap >= 96 && DEFAULT_ICON_OPTS.cap <= 100, 'cap ≈ glowfic max');
   assert.ok(DEFAULT_ICON_OPTS.gap >= 6 && DEFAULT_ICON_OPTS.gap <= 8, 'small gap');
+  assert.ok(DEFAULT_ICON_PAD >= 6 && DEFAULT_ICON_PAD <= 10, 'icon padding is small/symmetric');
 });
 
-// ---------------------------------------------------------------------------
-// computeIconSegments — the (uncapped) arm flow segment
-// ---------------------------------------------------------------------------
-
-test('computeIconSegments: arm spans the whole gap to the next same-side icon', () => {
-  // 200px to the next same-side icon → segment 200 - gap(8) = 192, UNCAPPED
-  // (the arm fills the flow segment even though the icon image would cap at 100).
-  const segs = computeIconSegments([0, 200], 1000, OPTS);
-  assert.equal(segs[0], 192, 'arm height is the full span minus clearance, not the cap');
-});
-
-test('computeIconSegments: last arm runs to the container bottom', () => {
-  const segs = computeIconSegments([0, 100], 600, OPTS);
-  assert.equal(segs[1], 600 - 100 - OPTS.gap, 'last arm reaches container bottom');
-});
-
-test('computeIconSegments: dense / degenerate spans floor at min', () => {
-  const segs = computeIconSegments([0, 24, 24], 500, OPTS);
-  assert.ok(segs.every((s) => s >= OPTS.min), 'no arm shorter than min');
-});
-
-test('computeIconSizes is the segment capped at cap', () => {
-  // Same inputs: the IMAGE caps at cap while the ARM (segment) does not.
-  const tops = [0, 400];
-  const segs = computeIconSegments(tops, 1000, OPTS);
-  const sizes = computeIconSizes(tops, 1000, OPTS);
-  assert.equal(segs[0], 392, 'arm segment uncapped');
-  assert.equal(sizes[0], OPTS.cap, 'icon image capped');
-  assert.equal(sizes[0], Math.min(OPTS.cap, segs[0]), 'size = min(cap, segment)');
-});
-
-test('computeIconSegments: does not mutate its input', () => {
-  const tops = [0, 50, 100];
-  const copy = [...tops];
-  computeIconSegments(tops, 500, OPTS);
-  assert.deepEqual(tops, copy, 'input array untouched');
+test('computeIconSizes: cap is the PRIMARY size whenever space allows', () => {
+  // Plenty of vertical room on every side → every icon sits at the cap, NOT a
+  // flowing segment. This is the cap-primary rule.
+  const sizes = computeIconSizes([0, 500, 1000], 4000, OPTS);
+  assert.deepEqual(sizes, [OPTS.cap, OPTS.cap, OPTS.cap], 'all icons at the cap');
 });
 
 // ---------------------------------------------------------------------------
@@ -164,7 +135,7 @@ function mockGeometry(reader: HTMLElement, topFor: (post: HTMLElement, side: str
   }
 }
 
-test('layoutIcons: applies square icon sizes and arm heights from mocked offsetTop', () => {
+test('layoutIcons: sizes the compact icon box, not a flowing arm', () => {
   const { reader } = readerWithPosts(4);
   // Posts 0,2 are left (rows at 0, 200); posts 1,3 are right (rows at 100, 300).
   // Spacing of 200 between same-side icons. Column tall.
@@ -178,24 +149,26 @@ test('layoutIcons: applies square icon sizes and arm heights from mocked offsetT
     assert.equal(box.style.width, box.style.height, 'icon box is square');
     assert.ok(box.style.width.endsWith('px'), 'size written in px');
   }
-  // Left side first icon: next same-side top is 200 away → image caps at 100,
-  // but the ARM spans the full segment (200 - gap 8 = 192).
+  // Left side first icon: ~200px of same-side room → the icon sits at the cap
+  // (cap-primary), in a COMPACT box. The arm is never given a flow-segment
+  // height — its size is icon + padding, derived in CSS.
   const leftPost = reader.querySelector('.glr-post--left') as HTMLElement;
   assert.equal(
     (leftPost.querySelector('.glr-icon-box') as HTMLElement).style.width,
     '100px',
-    'isolated icon image grows to cap',
+    'isolated icon sits at the cap',
   );
   assert.equal(
     (leftPost.querySelector('.glr-arm') as HTMLElement).style.height,
-    '192px',
-    'arm height is the uncapped flow segment',
+    '',
+    'arm is NOT given a flowing height (box is icon + padding via CSS)',
   );
 });
 
-test('layoutIcons: dense same-side run keeps icons AND arms at min', () => {
+test('layoutIcons: dense same-side run shrinks icons to avoid box overlap', () => {
   const { reader } = readerWithPosts(6);
-  // Pack same-side icons only 10px apart → available 10 - gap(8) = 2 < min.
+  // Pack same-side icons only 10px apart → the padded box cannot fit, so the
+  // icon floors at min (the box's padding is folded into the clearance).
   mockGeometry(reader, (_post, _side, i) => i * 10, 1000);
   layoutIcons(reader);
 
@@ -208,8 +181,8 @@ test('layoutIcons: dense same-side run keeps icons AND arms at min', () => {
   );
   assert.equal(
     (leftPost.querySelector('.glr-arm') as HTMLElement).style.height,
-    '26px',
-    'dense run arm floored at min',
+    '',
+    'no flowing arm height in a dense run either',
   );
 });
 

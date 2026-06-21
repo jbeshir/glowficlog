@@ -2,15 +2,20 @@
 // implementing the glowficlog reader layout. No global state, no mutation of the
 // input. The same posts + options always produce the same structure.
 //
-// Layout (see project brief): one continuous centred column of post bodies. Each
-// post owns a subtle STRIPE tint (A/B by index parity) painted as a rotated "L":
-// a horizontal text BAND plus a vertical gutter ARM holding the post's own icon.
-// Posts ALTERNATE side per post, so the L-blocks interlock. The CRITICAL rule is
-// that a gutter is coloured by the post whose ICON occupies it (the arm), not the
-// text beside it — the arm flows downward past later posts, carrying its owner's
-// tint, and `layoutIcons` sizes it to that flow segment. The FIRST appearance of
-// a character+author identity shows full identity, repeats show a condensed chip.
-// All structural classes are `glr-` prefixed.
+// Layout (see project brief / spec v4): one continuous centred column of post
+// bodies. Each post owns a subtle STRIPE tint (A/B by index parity) painted as
+// three connected pieces that read as one region:
+//   - a COMPACT icon BOX (the `.glr-arm`): the icon image plus a small symmetric
+//     padding, top-aligned with the post's first line. It is sized to icon+pad
+//     only — it never flows down to the next icon.
+//   - a thin CONNECTOR: the short horizontal stroke joining the icon box to the
+//     body (the spec's "L" laid on its side).
+//   - the BODY tint (the `.glr-band`): the rounded rectangle behind the text.
+// Posts ALTERNATE side per post, so adjacent blocks sit on opposite gutters and
+// differ in tint. `layoutIcons` sizes the icon (cap-primary, shrinking only to
+// avoid same-side overlap). The FIRST appearance of a character+author identity
+// shows full identity, repeats show a condensed chip. All structural classes are
+// `glr-` prefixed.
 
 import type { Post, RenderOptions } from './types.js';
 
@@ -97,12 +102,13 @@ function buildMonogram(doc: Document, post: Post, title: string): HTMLElement {
 }
 
 /**
- * Build the post's tinted gutter ARM: the vertical stroke of its L. The arm
- * carries the post's own stripe tint (so the gutter belongs to the icon's owner)
- * and holds the icon box at its TOP. `layoutIcons` later sets its height to the
- * flow segment; until then CSS shows it at the icon-min size. The arm is on the
- * post's gutter side and is absolutely pinned to the post top, free to overflow
- * downward into the (opposite-side, empty) gutter of later posts.
+ * Build the post's COMPACT tinted icon box (`.glr-arm`): the icon image wrapped
+ * in a small symmetric padding (`--glr-icon-pad`), carrying the post's own
+ * stripe tint. It is absolutely placed in the post's gutter, hugging the text
+ * column and top-aligned with the post's first line; it is sized to icon+pad
+ * only and never flows down past the post. The `--side`/`--stripe` classes are
+ * retained so the box's owner and gutter are identifiable in the DOM and so the
+ * gutter is always tinted by the post whose icon occupies it.
  */
 function buildArm(
   doc: Document,
@@ -119,10 +125,9 @@ function buildArm(
     ? `${post.iconKeyword} — ${fullIdentityLabel(post)}`
     : fullIdentityLabel(post);
 
-  // The square box is absolutely pinned to the arm top by reader.css and sized
-  // (post-insert) by layoutIcons; renderReader stays layout-free and emits it at
-  // the CSS min size. The monogram, when shown, occupies the box exactly as the
-  // image would.
+  // The square icon sits inside the box's padding and is sized (post-insert) by
+  // layoutIcons; renderReader stays layout-free and emits it at the CSS min size.
+  // The monogram, when shown, occupies the square exactly as the image would.
   const box = el(doc, 'div', `${NS}-icon-box`);
 
   if (post.iconUrl) {
@@ -232,13 +237,17 @@ export function renderReader(
     article.setAttribute('data-stripe', stripe);
     if (post.character) article.setAttribute('data-character', post.character);
 
-    // Three layers form the rotated-L: the BAND (horizontal stroke, behind the
-    // text), the ARM (vertical stroke in the gutter, holding the icon), and the
-    // BODY (text). Band and arm share the post's stripe tint; CSS confines the
-    // band to the icon side so it never bleeds into the opposite gutter.
+    // Three tinted pieces, all carrying the post's stripe, read as one region:
+    // the BAND (the rounded rectangle behind the text body), the CONNECTOR (a
+    // thin horizontal stroke bridging the icon box to the band), and the compact
+    // icon BOX (`.glr-arm`, holding the icon). The BODY (text) paints above the
+    // band so its full-contrast text is never dimmed by the tint.
     const band = el(doc, 'div', `${NS}-band ${NS}-stripe-${stripe}`);
     band.setAttribute('aria-hidden', 'true');
     article.appendChild(band);
+    const connector = el(doc, 'div', `${NS}-connector ${NS}-stripe-${stripe}`);
+    connector.setAttribute('aria-hidden', 'true');
+    article.appendChild(connector);
     article.appendChild(buildArm(doc, post, side, stripe));
 
     const body = el(doc, 'div', `${NS}-body`);

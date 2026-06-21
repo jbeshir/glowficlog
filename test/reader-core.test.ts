@@ -115,14 +115,16 @@ for (const meta of manifest) {
         `post ${i} is on the ${side}`,
       );
       // Structural children all present + scoped.
-      assert.ok(el.querySelector('.glr-arm'), `post ${i} has a gutter arm`);
-      assert.ok(el.querySelector('.glr-band'), `post ${i} has a text band`);
+      assert.ok(el.querySelector('.glr-arm'), `post ${i} has a compact icon box`);
+      assert.ok(el.querySelector('.glr-band'), `post ${i} has a body rectangle`);
+      assert.ok(el.querySelector('.glr-connector'), `post ${i} has an icon→body connector`);
       assert.ok(el.querySelector('.glr-icon-box'), `post ${i} has an icon box`);
       assert.ok(el.querySelector('.glr-body'), `post ${i} has body`);
       assert.ok(el.querySelector('.glr-content'), `post ${i} has content`);
 
-      // The L's two strokes (band + arm) carry the SAME stripe as the post, and
-      // posts alternate stripe by parity so adjacent L-blocks interlock.
+      // The three tinted pieces (icon box + connector + body band) carry the SAME
+      // stripe as the post, and posts alternate stripe by parity so adjacent
+      // blocks differ.
       const stripe = i % 2 === 0 ? 'a' : 'b';
       assert.ok(
         el.classList.contains(`glr-stripe-${stripe}`),
@@ -130,11 +132,15 @@ for (const meta of manifest) {
       );
       assert.ok(
         el.querySelector(`.glr-arm.glr-stripe-${stripe}`),
-        `post ${i} arm carries stripe ${stripe}`,
+        `post ${i} icon box carries stripe ${stripe}`,
       );
       assert.ok(
         el.querySelector(`.glr-band.glr-stripe-${stripe}`),
-        `post ${i} band carries stripe ${stripe}`,
+        `post ${i} body band carries stripe ${stripe}`,
+      );
+      assert.ok(
+        el.querySelector(`.glr-connector.glr-stripe-${stripe}`),
+        `post ${i} connector carries stripe ${stripe}`,
       );
     });
 
@@ -159,7 +165,7 @@ for (const meta of manifest) {
     // markup which legitimately keeps the host page's own classes).
     const ours = [
       reader,
-      ...Array.from(reader.querySelectorAll('.glr-post, .glr-arm, .glr-band, .glr-body, .glr-identity, .glr-column')),
+      ...Array.from(reader.querySelectorAll('.glr-post, .glr-arm, .glr-band, .glr-connector, .glr-body, .glr-identity, .glr-column')),
     ];
     for (const el of ours) {
       for (const cls of Array.from(el.classList)) {

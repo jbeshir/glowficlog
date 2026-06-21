@@ -7,9 +7,9 @@ export type { ThemeVars } from './theme.js';
 export { readThemeFromDocument, applyTheme, withAlpha, isTransparent } from './theme.js';
 export type { IconSizeOpts } from './layout.js';
 export {
-  computeIconSegments,
   computeIconSizes,
   layoutIcons,
   DEFAULT_ICON_OPTS,
+  DEFAULT_ICON_PAD,
 } from './layout.js';
 export { commonAncestor } from './dom.js';
