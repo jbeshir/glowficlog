@@ -175,7 +175,7 @@
   position: absolute;
   top: calc(var(--glr-post-pad) + 0.3em);
   height: var(--glr-connector-h);
-  width: calc(var(--glr-icon-pad) + var(--glr-gap) + 2px);
+  width: calc(var(--glr-icon-pad) + var(--glr-gap) + 6px);
   pointer-events: none;
   z-index: 0;
 }
@@ -299,6 +299,11 @@
    name to the right so it sits under its icon; left-gutter posts stay left. */
 .glr-post--right .glr-identity {
   justify-content: flex-end;
+}
+
+/* Right-gutter posts: right-align the body text too, so it sits under the icon. */
+.glr-post--right .glr-content {
+  text-align: right;
 }
 
 /* Character name: the most prominent line of the post header — full fg, bold,
