@@ -122,8 +122,8 @@ First build: `make build` (everything loads from `dist/`).
 
 1. Go to `about:debugging#/runtime/this-firefox`.
 2. **Load Temporary Add-on…** → choose `dist/manifest.json`.
-3. Open any thread, e.g. `https://glowfic.com/posts/47494`, and click the
-   bottom-right **Reader** button (or press **Alt+G**).
+3. Open any thread, e.g. `https://glowfic.com/posts/53995`, and click the
+   bottom-right **Glowlog** button (or press **Alt+G**).
 
 **Chrome / Chromium / Edge**
 
