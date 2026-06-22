@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.1.1-alpha — 2026-06-22
+
+### Reader
+
+- **Non-square icons** keep their natural aspect ratio (portrait and landscape
+  icons are shown un-cropped), bounded so they can't grow too tall (colliding
+  with the next same-side icon) or too wide (overflowing the gutter).
+- **Alt re-announcement**: glowfic authors share a character name across alts
+  that differ only by screenname/author. The reader now re-shows the full
+  identity whenever the previous occurrence of a character name had a different
+  screenname or author, then condenses again while it stays the same.
+- **Hover preview** is now a genuine zoom (longest edge fixed at 240px, scaling
+  small icons up rather than showing an icon-sized twin) and always opens toward
+  the centre of the screen, into the reading area.
+
+### Dev
+
+- Two new captured fixtures: `icon-aspect` (thread 1025; non-square icons) and
+  `alts` (thread 4265 p40; one character name alternating between two
+  screennames).
+
 ## v0.1.0-alpha — 2026-06-22
 
 First alpha. A cross-browser (Firefox + Chromium) Manifest V3 extension that

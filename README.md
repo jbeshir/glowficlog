@@ -41,10 +41,15 @@ A **continuous, centred text column**:
   post taller than its text. Short rapid dialogue therefore becomes very dense;
   long infodumps still show a visible icon.
 - **Hovering** an icon shows it **full size** in a popover.
-- The **first appearance** of a character (keyed by character + author identity)
-  shows a fuller icon and **full identity** (character name + screenname +
-  author). **Repeats** by the same identity show a condensed icon and a compact
-  **character-name chip**, with the full identity available on hover (`title`).
+- Icons keep their **natural aspect ratio** — portrait and landscape icons are
+  shown un-cropped — bounded so they can never grow tall enough to collide with
+  the next same-side icon or wide enough to overflow their gutter.
+- The **first appearance** of a character shows **full identity** (character
+  name + screenname + author); **repeats** show a compact **character-name
+  chip**, with the full identity available on hover (`title`). Glowfic authors
+  share a character name across **alts** that differ only by screenname/author,
+  so whenever the writer behind a name changes the full identity is
+  **re-announced** (and condensed again while it stays the same).
 - Author-only out-of-character posts (`.spacer-alt`), the OP (`.post-post`),
   deleted characters (`[Deleted]`), deleted authors (`(deleted user)`), missing
   screennames, and iconless posts are all handled gracefully, in **both** the
@@ -79,7 +84,7 @@ scripts/build.mjs        esbuild bundling + asset copy; embeds fixtures.
 scripts/package.mjs      web-ext (Firefox) + Chrome zip.
 scripts/gen-icons.mjs    regenerates the placeholder extension icons.
 test/reader-core.test.ts node:test + jsdom unit tests (the in-pipeline render proxy).
-fixtures/                5 real captured thread fixtures + manifest.json.
+fixtures/                7 real captured thread fixtures + manifest.json.
 ```
 
 - `parsePosts(root)` accepts any `ParentNode` containing `.post-container`
@@ -154,7 +159,7 @@ Query parameters:
 
 | Param     | Values                                            | Default            |
 |-----------|---------------------------------------------------|--------------------|
-| `fixture` | `dialogue-2author`, `multi-author-3plus`, `icon-heavy`, `mixed-iconless`, `long-infodump` | first fixture |
+| `fixture` | `dialogue-2author`, `multi-author-3plus`, `icon-heavy`, `mixed-iconless`, `long-infodump`, `icon-aspect`, `alts` | first fixture |
 | `theme`   | `light`, `dark`                                   | `light`            |
 | `raw`     | `1` / `true` to show the raw original side-by-side | off               |
 

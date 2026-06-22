@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
 import { JSDOM } from 'jsdom';
 
-import { parsePosts, renderReader } from '../src/reader-core/index.js';
+import { parsePosts, renderReader, computeFullAppearances } from '../src/reader-core/index.js';
 import type { FixtureMeta, Post } from '../src/reader-core/index.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -20,10 +20,6 @@ const manifest: FixtureMeta[] = JSON.parse(
 
 function domFor(html: string): JSDOM {
   return new JSDOM(`<!DOCTYPE html><html><body>${html}</body></html>`);
-}
-
-function identityKey(p: Post): string {
-  return `${p.character ?? ''} ${p.author}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -144,14 +140,25 @@ for (const meta of manifest) {
       );
     });
 
-    // First-appearance logic: first occurrence of each identity is --first.
-    const distinct = new Set(posts.map(identityKey));
+    // First-appearance logic, INCLUDING alt re-announcement: a post is --first
+    // when its character name is new OR the previous occurrence of that name had
+    // a different screenname/author. computeFullAppearances is the source of truth.
+    const fulls = computeFullAppearances(posts);
+    const expectedFirst = fulls.filter(Boolean).length;
     const firstCount = reader.querySelectorAll('.glr-post--first').length;
-    assert.equal(firstCount, distinct.size, 'first-appearance count == distinct identities');
+    assert.equal(firstCount, expectedFirst, 'first-appearance count == full appearances');
+    // The class on each post matches the per-index decision.
+    rendered.forEach((el, i) => {
+      assert.equal(
+        el.classList.contains('glr-post--first'),
+        fulls[i],
+        `post ${i} --first matches computeFullAppearances`,
+      );
+    });
     if (posts.length > 0) {
       assert.ok(rendered[0].classList.contains('glr-post--first'), 'first post is --first');
     }
-    if (posts.length > distinct.size) {
+    if (posts.length > expectedFirst) {
       assert.ok(
         reader.querySelector('.glr-post--repeat'),
         'has at least one condensed repeat',
@@ -422,4 +429,129 @@ test('renderReader throws clearly when no document is available', () => {
     /no document available/,
     'must not silently no-op',
   );
+});
+
+// ---------------------------------------------------------------------------
+// computeFullAppearances — full-identity vs condensed, incl. alt re-announcement
+// ---------------------------------------------------------------------------
+
+/** Minimal Post factory for identity tests (only identity fields matter here). */
+function post(
+  character: string | null,
+  screenname: string | null,
+  author: string,
+): Post {
+  return Object.freeze({
+    id: `${character ?? '-'}/${screenname ?? '-'}/${author}`,
+    isOP: false,
+    iconUrl: null,
+    iconKeyword: null,
+    character,
+    screenname,
+    author,
+    bodyHtml: '',
+    permalink: null,
+  });
+}
+
+test('computeFullAppearances: first occurrence is full, identical repeats condense', () => {
+  const posts = [
+    post('Alice', 'screen', 'Auth'),
+    post('Alice', 'screen', 'Auth'),
+    post('Alice', 'screen', 'Auth'),
+  ];
+  assert.deepEqual(computeFullAppearances(posts), [true, false, false]);
+});
+
+test('computeFullAppearances: a changed SCREENNAME re-announces (alt)', () => {
+  const posts = [
+    post('Carissa Sevar', 'to-let-you-in', 'lintamande'),
+    post('Carissa Sevar', 'loves-her-strings', 'lintamande'),
+    post('Carissa Sevar', 'loves-her-strings', 'lintamande'),
+  ];
+  assert.deepEqual(computeFullAppearances(posts), [true, true, false]);
+});
+
+test('computeFullAppearances: a changed AUTHOR re-announces (alt)', () => {
+  const posts = [
+    post('Shared Name', 'a', 'AuthorOne'),
+    post('Shared Name', 'a', 'AuthorTwo'),
+  ];
+  assert.deepEqual(computeFullAppearances(posts), [true, true]);
+});
+
+test('computeFullAppearances: alternating alts re-announce every time (vs PREVIOUS)', () => {
+  // The comparison is against the most recent occurrence, not the whole history,
+  // so A/B/A/B flags a full appearance on every post.
+  const posts = [
+    post('Carissa Sevar', 'to-let-you-in', 'lintamande'),
+    post('Carissa Sevar', 'loves-her-strings', 'lintamande'),
+    post('Carissa Sevar', 'to-let-you-in', 'lintamande'),
+    post('Carissa Sevar', 'loves-her-strings', 'lintamande'),
+  ];
+  assert.deepEqual(computeFullAppearances(posts), [true, true, true, true]);
+});
+
+test('computeFullAppearances: a different character interleaved does not condense the return', () => {
+  const posts = [
+    post('Alice', 's', 'A'), // full (new)
+    post('Bob', 's', 'B'), // full (new)
+    post('Alice', 's', 'A'), // condensed — Alice unchanged since her last post
+  ];
+  assert.deepEqual(computeFullAppearances(posts), [true, true, false]);
+});
+
+test('computeFullAppearances: author-only posts key on the author alone', () => {
+  const posts = [
+    post(null, null, 'Narrator'), // full (new author-only)
+    post(null, null, 'Narrator'), // condensed
+    post(null, null, 'Other'), // full (new author)
+    post(null, null, 'Narrator'), // condensed again (unchanged since last)
+  ];
+  assert.deepEqual(computeFullAppearances(posts), [true, false, true, false]);
+});
+
+test('computeFullAppearances: a name and an author-only post that share a string do not collide', () => {
+  // A character literally named "Narrator" must not share identity state with an
+  // author-only post by author "Narrator".
+  const posts = [
+    post(null, null, 'Narrator'), // author-only Narrator → full
+    post('Narrator', 's', 'Someone'), // a CHARACTER named Narrator → full (distinct)
+    post(null, null, 'Narrator'), // author-only again → condensed (unchanged)
+  ];
+  assert.deepEqual(computeFullAppearances(posts), [true, true, false]);
+});
+
+test('computeFullAppearances: length matches and input is not mutated', () => {
+  const posts = [post('A', 's', 'X'), post('A', 't', 'X')];
+  const snapshot = JSON.stringify(posts);
+  const out = computeFullAppearances(posts);
+  assert.equal(out.length, posts.length);
+  assert.equal(JSON.stringify(posts), snapshot, 'inputs untouched');
+});
+
+test('fixture alts: the alternating-screenname character re-announces each switch', () => {
+  const html = readFileSync(join(fixturesDir, 'alts.html'), 'utf8');
+  const posts = parsePosts(domFor(html).window.document);
+  const fulls = computeFullAppearances(posts);
+
+  // "Carissa Sevar" flips between two screennames on nearly every post, so each
+  // of her appearances after a switch must be full, not condensed — meaning the
+  // number of full appearances far exceeds the 4 distinct character names.
+  const distinctNames = new Set(posts.map((p) => p.character ?? ` ${p.author}`));
+  assert.ok(
+    fulls.filter(Boolean).length > distinctNames.size,
+    'alts cause more full appearances than there are distinct names',
+  );
+
+  // Specifically: every Carissa post whose screenname differs from her previous
+  // Carissa post is flagged full.
+  let prevScreen: string | null | undefined;
+  posts.forEach((p, i) => {
+    if (p.character !== 'Carissa Sevar') return;
+    if (prevScreen !== undefined && p.screenname !== prevScreen) {
+      assert.equal(fulls[i], true, `Carissa post ${i} re-announces on screenname switch`);
+    }
+    prevScreen = p.screenname;
+  });
 });

@@ -41,9 +41,37 @@ function el(
   return node;
 }
 
-/** Identity is keyed by character + author (screenname is decorative only). */
-function identityKey(post: Post): string {
-  return `${post.character ?? ''}\u0000${post.author}`;
+/**
+ * PURE: decide, per post in order, whether it shows its FULL identity (character
+ * · screenname · author) as a "first appearance", or a condensed name chip.
+ *
+ * A post shows the full identity when:
+ *   - its character name has not appeared yet, OR
+ *   - the MOST RECENT previous post with the same character name had a different
+ *     screenname OR author.
+ *
+ * The second clause is the alt rule: glowfic authors share a character name
+ * across alts that differ only by screenname/author, so whenever the writer
+ * behind a name changes we re-announce the full identity (then condense again
+ * while it stays the same), and re-announce once more if a still-earlier alt
+ * takes the name back. Comparison is against the PREVIOUS occurrence, not the
+ * whole history, so an alt hand-off is always flagged.
+ *
+ * Author-only posts (no character) key on the author alone — they have no
+ * character/screenname to vary, so the first is full and the rest condense, as
+ * before. The `\u0000` separator (a source-level escape, so the file stays text)
+ * cannot occur in real names, so keys never collide. Inputs never mutated.
+ */
+export function computeFullAppearances(posts: readonly Post[]): boolean[] {
+  const lastSeen = new Map<string, string>();
+  return posts.map((post) => {
+    const primary =
+      post.character != null ? `c\u0000${post.character}` : `a\u0000${post.author}`;
+    const secondary = `${post.screenname ?? ''}\u0000${post.author}`;
+    const prev = lastSeen.get(primary);
+    lastSeen.set(primary, secondary);
+    return prev === undefined || prev !== secondary;
+  });
 }
 
 /** Human-readable full identity, used for titles/tooltips on condensed repeats. */
@@ -125,9 +153,10 @@ function buildArm(
     ? `${post.iconKeyword} — ${fullIdentityLabel(post)}`
     : fullIdentityLabel(post);
 
-  // The square icon sits inside the box's padding and is sized (post-insert) by
-  // layoutIcons; renderReader stays layout-free and emits it at the CSS min size.
-  // The monogram, when shown, occupies the square exactly as the image would.
+  // The icon sits inside the box's padding and is sized (post-insert) by
+  // layoutIcons, which fits it to its gutter preserving aspect ratio; renderReader
+  // stays layout-free and emits it at the CSS min size. The monogram, when shown,
+  // occupies the (square) box exactly as the image would.
   const box = el(doc, 'div', `${NS}-icon-box`);
 
   if (post.iconUrl) {
@@ -211,12 +240,13 @@ export function renderReader(
   const column = el(doc, 'div', `${NS}-column`);
   root.appendChild(column);
 
-  const seen = new Set<string>();
+  // Full-identity vs condensed decision per post, including alt re-announcement
+  // (a character name returning under a different screenname/author re-shows the
+  // full identity). Drives both the identity block and the --first/--repeat class.
+  const fullAppearance = computeFullAppearances(posts);
 
   posts.forEach((post, index) => {
-    const key = identityKey(post);
-    const isFirst = !seen.has(key);
-    seen.add(key);
+    const isFirst = fullAppearance[index];
 
     // Side and stripe alternate together by index parity, so adjacent posts
     // differ on BOTH and their L-blocks interlock.

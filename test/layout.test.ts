@@ -7,6 +7,7 @@ import { JSDOM } from 'jsdom';
 
 import {
   computeIconSizes,
+  fitIconBox,
   layoutIcons,
   markSingleLineBodies,
   isSingleLine,
@@ -18,6 +19,74 @@ import {
 } from '../src/reader-core/index.js';
 
 const OPTS = { min: 26, cap: 100, gap: 8 };
+
+// ---------------------------------------------------------------------------
+// fitIconBox — pure aspect-ratio fitting
+// ---------------------------------------------------------------------------
+
+/** Aspect ratio is preserved within a small tolerance (independent rounding-free). */
+function assertAspect(w: number, h: number, natW: number, natH: number): void {
+  assert.ok(
+    Math.abs(w / h - natW / natH) < 1e-9,
+    `aspect ${w}/${h} matches ${natW}/${natH}`,
+  );
+}
+
+test('fitIconBox: a square icon fills the (square) budget', () => {
+  const { w, h } = fitIconBox(100, 100, 96, 96);
+  assert.equal(w, 96);
+  assert.equal(h, 96);
+});
+
+test('fitIconBox: small square upscales to fill (matches prior cap-primary feel)', () => {
+  const { w, h } = fitIconBox(40, 40, 96, 96);
+  assert.equal(w, 96);
+  assert.equal(h, 96);
+});
+
+test('fitIconBox: portrait is height-bound, keeps aspect, never overflows', () => {
+  // 75×100 into 96×96: height binds (100 is the larger dim) → h=96, w=72.
+  const { w, h } = fitIconBox(75, 100, 96, 96);
+  assert.equal(h, 96, 'portrait height reaches the vertical budget');
+  assert.ok(w <= 96, 'width within the gutter');
+  assertAspect(w, h, 75, 100);
+});
+
+test('fitIconBox: landscape is width-bound, keeps aspect, never overflows', () => {
+  // 100×68 into 96×96: width binds → w=96, h≈65.
+  const { w, h } = fitIconBox(100, 68, 96, 96);
+  assert.equal(w, 96, 'landscape width reaches the gutter');
+  assert.ok(h <= 96, 'height within the vertical budget');
+  assertAspect(w, h, 100, 68);
+});
+
+test('fitIconBox: extreme aspect ratios still fit both budgets', () => {
+  for (const [nw, nh] of [
+    [778, 1027], // tall off-square
+    [434, 517],
+    [300, 50], // very wide
+    [50, 300], // very tall
+  ] as const) {
+    const { w, h } = fitIconBox(nw, nh, 96, 96);
+    assert.ok(w <= 96 + 1e-9 && h <= 96 + 1e-9, `${nw}x${nh} fits 96x96`);
+    assertAspect(w, h, nw, nh);
+  }
+});
+
+test('fitIconBox: a tight vertical budget bounds the HEIGHT, not just the square', () => {
+  // Dense run: maxHeight=28, gutter still 96. A landscape image must not exceed
+  // the 28px height budget even though the gutter is far wider.
+  const { w, h } = fitIconBox(100, 68, 28, 96);
+  assert.ok(h <= 28 + 1e-9, 'height clamped to the vertical budget');
+  assert.ok(w <= 96, 'width within the gutter');
+  assertAspect(w, h, 100, 68);
+});
+
+test('fitIconBox: unknown natural size falls back to a square (pre-decode / monogram)', () => {
+  assert.deepEqual(fitIconBox(0, 0, 96, 96), { w: 96, h: 96 });
+  assert.deepEqual(fitIconBox(0, 100, 80, 96), { w: 80, h: 80 }, 'square = min(maxH,maxW)');
+  assert.deepEqual(fitIconBox(100, 0, 96, 70), { w: 70, h: 70 });
+});
 
 // ---------------------------------------------------------------------------
 // computeIconSizes — pure geometry
@@ -187,6 +256,45 @@ test('layoutIcons: dense same-side run shrinks icons to avoid box overlap', () =
     '',
     'no flowing arm height in a dense run either',
   );
+});
+
+test('layoutIcons: non-square icons keep their aspect ratio within the gutter', () => {
+  const { reader } = readerWithPosts(2);
+  // One icon per side, both with ample vertical room → each fits to the cap (100)
+  // in its binding dimension while preserving aspect.
+  mockGeometry(reader, () => 0, 4000);
+
+  // Mock the natural sizes jsdom does not decode: post 0 (left) portrait 50×100,
+  // post 1 (right) landscape 100×50.
+  const imgs = Array.from(reader.querySelectorAll<HTMLImageElement>('.glr-icon'));
+  const leftImg = (reader.querySelector('.glr-post--left .glr-icon') as HTMLImageElement);
+  const rightImg = (reader.querySelector('.glr-post--right .glr-icon') as HTMLImageElement);
+  Object.defineProperty(leftImg, 'naturalWidth', { value: 50, configurable: true });
+  Object.defineProperty(leftImg, 'naturalHeight', { value: 100, configurable: true });
+  Object.defineProperty(rightImg, 'naturalWidth', { value: 100, configurable: true });
+  Object.defineProperty(rightImg, 'naturalHeight', { value: 50, configurable: true });
+  assert.equal(imgs.length, 2);
+
+  layoutIcons(reader);
+
+  const leftBox = reader.querySelector('.glr-post--left .glr-icon-box') as HTMLElement;
+  const rightBox = reader.querySelector('.glr-post--right .glr-icon-box') as HTMLElement;
+  // Portrait: height reaches the cap, width is half (aspect preserved).
+  assert.equal(leftBox.style.height, '100px', 'portrait reaches the cap in height');
+  assert.equal(leftBox.style.width, '50px', 'portrait width follows aspect');
+  // Landscape: width reaches the cap, height is half.
+  assert.equal(rightBox.style.width, '100px', 'landscape reaches the cap in width');
+  assert.equal(rightBox.style.height, '50px', 'landscape height follows aspect');
+});
+
+test('layoutIcons: an undecoded icon stays a square fallback (until it loads)', () => {
+  const { reader } = readerWithPosts(1);
+  mockGeometry(reader, () => 0, 4000);
+  // jsdom never decodes the image (naturalWidth stays 0) → square fallback.
+  layoutIcons(reader);
+  const box = reader.querySelector('.glr-icon-box') as HTMLElement;
+  assert.equal(box.style.width, box.style.height, 'fallback box is square');
+  assert.equal(box.style.width, '100px', 'square fallback at the cap');
 });
 
 test('layoutIcons: no posts is a safe no-op', () => {

@@ -7,10 +7,17 @@
 // compact boxes; dense short runs get smaller icons. The box tint, a thin
 // connector and the post body all share the post's stripe, reading as one region.
 //
-// The geometry is split into a PURE core (`computeIconSizes`) and a thin DOM
-// layer (`layoutIcons`) that measures each post's `offsetTop` and writes the
-// square icon-box size. The arm/box height is NOT set here — CSS derives it from
-// the icon size plus `--glr-icon-pad`, so the box stays exactly icon + padding.
+// Icons keep their natural ASPECT RATIO: `computeIconSizes` gives each icon's
+// vertical budget (its MAX HEIGHT), the gutter width is its MAX WIDTH, and
+// `fitIconBox` scales the real image into both, so portrait/landscape icons are
+// shown un-cropped, bounded so they can't grow too tall (same-side collision) or
+// too wide (gutter overflow).
+//
+// The geometry is split into a PURE core (`computeIconSizes` + `fitIconBox`) and
+// a thin DOM layer (`layoutIcons`) that measures each post's `offsetTop` and the
+// icon's natural size and writes the fitted icon-box width/height. The surrounding
+// arm padding is NOT set here — CSS derives it from `--glr-icon-pad`, so the box
+// stays exactly icon + padding.
 
 /** Tunables for {@link computeIconSizes}; px. */
 export interface IconSizeOpts {
@@ -61,6 +68,51 @@ export function computeIconSizes(
 function readPx(style: CSSStyleDeclaration, name: string, fallback: number): number {
   const v = Number.parseFloat(style.getPropertyValue(name));
   return Number.isFinite(v) ? v : fallback;
+}
+
+// ---------------------------------------------------------------------------
+// Non-square icon fitting (aspect-ratio preserving)
+// ---------------------------------------------------------------------------
+
+/** A fitted icon box's pixel dimensions. */
+export interface IconBox {
+  readonly w: number;
+  readonly h: number;
+}
+
+/**
+ * PURE: fit an icon of natural size `natW × natH` into its gutter, PRESERVING
+ * aspect ratio, bounded so it can neither grow too tall (and collide with the
+ * next same-side icon) nor too wide (and protrude past its gutter into the text
+ * or off-page):
+ *
+ *   - `maxHeight` is the vertical budget for this icon — the same-side span from
+ *     {@link computeIconSizes}, which already folds in the cap — so the box's
+ *     HEIGHT never exceeds it (no same-side collision, never taller than the cap).
+ *   - `maxWidth` is the gutter's inner width, so the box's WIDTH never exceeds it
+ *     (never overflows the gutter).
+ *
+ * The icon is scaled as large as it can be while fitting BOTH budgets (so a
+ * roughly-square icon still fills toward the cap, matching the prior behaviour),
+ * with aspect ratio intact. When natural dimensions are unknown — 0, i.e. the
+ * image has not decoded yet, or it is a monogram with no real image — it falls
+ * back to a SQUARE box of `min(maxHeight, maxWidth)`, exactly the pre-aspect
+ * sizing, so nothing regresses until the real dimensions are known.
+ *
+ * No DOM, no globals, inputs never mutated.
+ */
+export function fitIconBox(
+  natW: number,
+  natH: number,
+  maxHeight: number,
+  maxWidth: number,
+): IconBox {
+  if (!(natW > 0) || !(natH > 0)) {
+    const s = Math.min(maxHeight, maxWidth);
+    return { w: s, h: s };
+  }
+  const scale = Math.min(maxHeight / natH, maxWidth / natW);
+  return { w: natW * scale, h: natH * scale };
 }
 
 // ---------------------------------------------------------------------------
@@ -179,20 +231,22 @@ export function markSingleLineBodies(root: HTMLElement): void {
 /**
  * Measure-and-apply pass. For each gutter side, collect that side's posts in
  * document order, read each post's `offsetTop` (relative to the positioned
- * `.glr-column`), then size the icon IMAGE/monogram square to
- * {@link computeIconSizes}, additionally clamped so the *padded* box fits the
- * gutter width. The clearance passed to `computeIconSizes` is widened by twice
- * the icon padding so a cap-sized box never collides with the next same-side
- * box (the box is icon + 2 × pad).
+ * `.glr-column`), compute its vertical budget via {@link computeIconSizes}, then
+ * fit the real icon into that height and the gutter width with {@link fitIconBox},
+ * preserving aspect ratio. The clearance passed to `computeIconSizes` is widened
+ * by twice the icon padding so a cap-sized box never collides with the next
+ * same-side box (the box is icon + 2 × pad).
  *
- * Only the icon-box square is written; the surrounding tinted box (`.glr-arm`)
- * derives its size from that square plus `--glr-icon-pad` in CSS, so it always
+ * Only the icon-box width/height are written; the surrounding tinted box
+ * (`.glr-arm`) derives its padding from `--glr-icon-pad` in CSS, so it always
  * stays exactly icon + padding and never grows into a flowing arm. Tunables come
  * from the reader's CSS custom properties (`--glr-icon-min/-cap/-gap/-pad`,
  * `--glr-gutter`) with {@link DEFAULT_ICON_OPTS} / {@link DEFAULT_ICON_PAD} as
  * the fallback.
  *
- * Idempotent and safe to call repeatedly (e.g. on resize).
+ * Idempotent and safe to call repeatedly (e.g. on resize). Icons whose natural
+ * size is not yet known get a one-shot `load` listener that re-runs the pass once
+ * they decode, so the aspect-correct box replaces the square fallback.
  */
 export function layoutIcons(root: HTMLElement): void {
   const column = (root.querySelector('.glr-column') as HTMLElement | null) ?? root;
@@ -226,13 +280,29 @@ export function layoutIcons(root: HTMLElement): void {
     );
     if (posts.length === 0) continue;
     const tops = posts.map((p) => p.offsetTop);
+    // computeIconSizes gives each icon's vertical budget (same-side span, capped):
+    // that is the box's MAX HEIGHT. The gutter inner width (maxImage) is the box's
+    // MAX WIDTH. fitIconBox scales the real image into both, preserving aspect.
     const sizes = computeIconSizes(tops, containerBottom, clearance);
     posts.forEach((post, i) => {
       const box = post.querySelector<HTMLElement>('.glr-icon-box');
-      if (box) {
-        const px = `${Math.round(Math.min(sizes[i], maxImage))}px`;
-        box.style.width = px;
-        box.style.height = px;
+      if (!box) return;
+      const img = box.querySelector<HTMLImageElement>('.glr-icon');
+      const { w, h } = fitIconBox(
+        img?.naturalWidth ?? 0,
+        img?.naturalHeight ?? 0,
+        sizes[i],
+        maxImage,
+      );
+      box.style.width = `${Math.round(w)}px`;
+      box.style.height = `${Math.round(h)}px`;
+      // An icon's natural size is unknown until it decodes (it loads AFTER this
+      // pass runs at mount). Re-flow once it does so the square fallback above is
+      // replaced by the aspect-correct box. Guarded + one-shot so repeated
+      // layoutIcons calls (resize) never stack listeners.
+      if (img && !(img.naturalWidth > 0) && img.dataset.glrRelayout !== '1') {
+        img.dataset.glrRelayout = '1';
+        img.addEventListener('load', () => layoutIcons(root), { once: true });
       }
     });
   }

@@ -5,14 +5,21 @@
 // appended to <body> — deliberately OUTSIDE the reader subtree — so no ancestor
 // `overflow` can clip it and showing it causes NO layout shift (it is
 // `position: fixed`). A small show delay debounces quick fly-overs and a CSS
-// opacity transition fades it in/out. The preview is reused across icons, capped
-// at ~200px on its longest edge, and skipped entirely for monogram fallbacks
-// (which have no real `<img>`). `enableIconPreviews` returns a cleanup function
-// that detaches every listener and removes the floating node, so toggling the
-// reader off leaves no trace.
+// opacity transition fades it in/out. The preview is reused across icons, sized
+// to a fixed longest edge (see PREVIEW_EDGE), and skipped entirely for monogram
+// fallbacks (which have no real `<img>`). `enableIconPreviews` returns a cleanup
+// function that detaches every listener and removes the floating node, so
+// toggling the reader off leaves no trace.
 
-/** Longest-edge cap (px) for the enlarged preview. */
-const PREVIEW_MAX = 200;
+/**
+ * Longest-edge size (px) of the enlarged preview. The in-column icon caps at
+ * ~96px and now renders at its true aspect ratio, so a same-size popover would
+ * look identical to the icon; this is deliberately well above that cap so the
+ * preview is an obvious ZOOM. The image's longest edge is scaled to exactly this
+ * (UP for the common ~100px icon, DOWN for large-resolution ones), preserving
+ * aspect ratio.
+ */
+const PREVIEW_EDGE = 240;
 /** Delay (ms) before the preview appears, so a passing cursor never flashes it. */
 const SHOW_DELAY = 140;
 /** Gap (px) kept between the icon and the floating preview. */
@@ -76,29 +83,34 @@ export function enableIconPreviews(root: HTMLElement): () => void {
     const { wrap, img } = ensurePreview();
     if (img.getAttribute('src') !== src) img.setAttribute('src', src);
 
-    // Cap the longest edge at PREVIEW_MAX, preserving aspect ratio. Natural
-    // dimensions can be 0 (not yet decoded / headless) → fall back to a square.
-    let w = natW || PREVIEW_MAX;
-    let h = natH || PREVIEW_MAX;
-    const scale = Math.min(1, PREVIEW_MAX / Math.max(w, h));
+    // Scale the longest edge to PREVIEW_EDGE, preserving aspect ratio — UP for
+    // small icons (so the preview is an obvious zoom, not an icon-sized twin) and
+    // DOWN for large-resolution ones. Natural dimensions can be 0 (not yet
+    // decoded / headless) → fall back to a square.
+    let w = natW || PREVIEW_EDGE;
+    let h = natH || PREVIEW_EDGE;
+    const scale = PREVIEW_EDGE / Math.max(w, h);
     w = Math.max(1, Math.round(w * scale));
     h = Math.max(1, Math.round(h * scale));
     img.style.width = `${w}px`;
     img.style.height = `${h}px`;
 
-    // Position next to the icon, flipping to the other side / clamping so the
-    // preview always stays fully inside the viewport.
+    // Position the preview toward the CENTRE of the screen: an icon in the left
+    // gutter (left of viewport centre) opens to its right, one in the right
+    // gutter opens to its left. This always moves the popover into the reading
+    // area, never out toward the edge where a same-ish-sized popover would read
+    // as a pointless duplicate of the icon. Clamp to keep it on-screen.
     const rect = box.getBoundingClientRect();
     const vw = win?.innerWidth ?? 0;
     const vh = win?.innerHeight ?? 0;
     const fullW = w + FRAME * 2;
     const fullH = h + FRAME * 2;
 
-    let left = rect.right + EDGE_GAP;
-    if (vw && left + fullW > vw - EDGE_GAP) left = rect.left - EDGE_GAP - fullW;
-    if (left < EDGE_GAP) {
-      left = vw ? Math.max(EDGE_GAP, vw - fullW - EDGE_GAP) : EDGE_GAP;
-    }
+    const iconCentreX = rect.left + rect.width / 2;
+    const openRight = vw ? iconCentreX < vw / 2 : true;
+    let left = openRight ? rect.right + EDGE_GAP : rect.left - EDGE_GAP - fullW;
+    if (vw) left = Math.max(EDGE_GAP, Math.min(left, vw - fullW - EDGE_GAP));
+    else left = Math.max(EDGE_GAP, left);
     let top = rect.top + rect.height / 2 - fullH / 2;
     if (vh) top = Math.max(EDGE_GAP, Math.min(top, vh - fullH - EDGE_GAP));
     else top = Math.max(EDGE_GAP, top);

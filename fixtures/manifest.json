@@ -68,5 +68,33 @@
     "avgPostChars": 1581,
     "category": "long-infodump",
     "notes": "Thread 57823; 29 posts >800 chars; avg 1581 chars"
+  },
+  {
+    "name": "icon-aspect",
+    "file": "icon-aspect.html",
+    "sourceUrl": "https://glowfic.com/posts/1025?view=flat",
+    "view": "flat",
+    "postCount": 36,
+    "distinctAuthors": 2,
+    "distinctCharacters": 2,
+    "hasIconlessPosts": false,
+    "hasAuthorOnlyPosts": false,
+    "avgPostChars": 251,
+    "category": "icon-aspect",
+    "notes": "Thread 1025; includes NON-SQUARE icons (portrait & landscape, e.g. 75x100, 100x68, 434x517, 778x1027) for aspect-ratio testing"
+  },
+  {
+    "name": "alts",
+    "file": "alts.html",
+    "sourceUrl": "https://glowfic.com/posts/4265?page=40",
+    "view": "paginated",
+    "postCount": 26,
+    "distinctAuthors": 2,
+    "distinctCharacters": 4,
+    "hasIconlessPosts": true,
+    "hasAuthorOnlyPosts": false,
+    "avgPostChars": 247,
+    "category": "alts",
+    "notes": "Thread 4265 p40; 'Carissa Sevar' (lintamande) alternates screennames to-let-you-in / loves-her-strings — alt re-announcement test; 5 iconless posts"
   }
 ]
