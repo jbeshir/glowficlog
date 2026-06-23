@@ -33,6 +33,8 @@
   --glr-icon-min: 28px;        /* floor ≈ one line height: dense runs stay tiny */
   --glr-icon-cap: 96px;        /* PRIMARY size ≈ glowfic native max (icon image only) */
   --glr-icon-gap: 8px;         /* clearance kept between same-side icon boxes */
+  --glr-moiety-ring: 2px;      /* per-author colour ring thickness */
+  --glr-moiety-gap: 2px;       /* neutral gap between icon edge and colour ring */
 
   /* colour palette — fallback defaults; overridden inline by applyTheme and by
      [data-theme="dark"] below. */
@@ -232,6 +234,15 @@
   border-radius: 7px;
   background: var(--glr-chip-bg);
   container-type: size; /* lets the monogram glyph scale with the box */
+  /* Moiety ring: draws into the arm's --glr-icon-pad (8px) so it is never
+     clipped. When --glr-moiety is unset, var(--glr-moiety) (no fallback) is
+     the guaranteed-invalid value → the whole box-shadow is
+     invalid-at-computed-value-time → resets to none → NO ring. Legible on
+     light and dark because the gap uses the host --glr-bg and the ring uses
+     the author colour. */
+  box-shadow:
+    0 0 0 var(--glr-moiety-gap) var(--glr-bg),
+    0 0 0 calc(var(--glr-moiety-gap) + var(--glr-moiety-ring)) var(--glr-moiety);
 }
 
 .glr-icon {

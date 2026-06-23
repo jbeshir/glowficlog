@@ -3,7 +3,7 @@
 // (browser/chrome) is feature-detected with a localStorage fallback, so the
 // helpers also work in plain pages / tests without an extension host.
 
-/** User-configurable reader options (all default OFF). */
+/** User-configurable reader options (most default OFF; moietyRings defaults ON). */
 export interface Options {
   /** Master toggle: is the reader shown on a thread? */
   readonly enabled: boolean;
@@ -11,6 +11,8 @@ export interface Options {
   readonly trimBlankEdges: boolean;
   /** Super-condensed view: hairline gaps + tight vertical padding. */
   readonly condensed: boolean;
+  /** Draw a colour ring around each author's icon using their glowfic moiety colour. */
+  readonly moietyRings: boolean;
 }
 
 /** storage.local keys, one per {@link Options} field. */
@@ -18,12 +20,14 @@ export const STORAGE_KEYS = {
   enabled: 'glowficlog:enabled',
   trimBlankEdges: 'glowficlog:trimBlankEdges',
   condensed: 'glowficlog:condensed',
+  moietyRings: 'glowficlog:moietyRings',
 } as const;
 
 export const DEFAULT_OPTIONS: Options = {
   enabled: false,
   trimBlankEdges: false,
   condensed: false,
+  moietyRings: true,
 };
 
 // ---- WebExtension API (feature-detected; no @types/chrome dependency) ----
@@ -62,7 +66,16 @@ function readLocalStorage(key: string): boolean {
   }
 }
 
-/** Read all options at once (OFF by default), with a localStorage fallback. */
+// Returns true when the key is absent (null) or explicitly 'true'; only 'false' → false.
+function readLocalStorageDefaultTrue(key: string): boolean {
+  try {
+    return globalThis.localStorage?.getItem(key) !== 'false';
+  } catch {
+    return true;
+  }
+}
+
+/** Read all options at once, with a localStorage fallback. */
 export async function loadOptions(): Promise<Options> {
   const area = ext?.storage?.local;
   if (area) {
@@ -72,6 +85,7 @@ export async function loadOptions(): Promise<Options> {
         enabled: r[STORAGE_KEYS.enabled] === true,
         trimBlankEdges: r[STORAGE_KEYS.trimBlankEdges] === true,
         condensed: r[STORAGE_KEYS.condensed] === true,
+        moietyRings: r[STORAGE_KEYS.moietyRings] !== false,
       };
     } catch (err) {
       console.warn('[glowficlog] storage.get failed; falling back', err);
@@ -81,6 +95,7 @@ export async function loadOptions(): Promise<Options> {
     enabled: readLocalStorage(STORAGE_KEYS.enabled),
     trimBlankEdges: readLocalStorage(STORAGE_KEYS.trimBlankEdges),
     condensed: readLocalStorage(STORAGE_KEYS.condensed),
+    moietyRings: readLocalStorageDefaultTrue(STORAGE_KEYS.moietyRings),
   };
 }
 

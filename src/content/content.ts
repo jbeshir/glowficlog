@@ -16,7 +16,9 @@ import {
   mountReaderInPostList,
   unmountReader,
   enableIconPreviews,
+  applyMoieties,
 } from '../reader-core/index.js';
+import { applyMoietyRings } from './moiety.js';
 import {
   loadOptions,
   setOption,
@@ -80,6 +82,9 @@ function activate(): void {
   // Decide per-post single-line body alignment once the body has a measured
   // height (right-gutter single-line bodies right-align; everything else left).
   markSingleLineBodies(reader);
+  // Fetch and apply per-author moiety colour rings. Fire-and-forget — must not
+  // block the initial render.
+  if (options.moietyRings) void applyMoietyRings(reader);
 }
 
 // Post heights — and therefore how far an icon may grow before meeting the next
@@ -181,6 +186,15 @@ function onStorageChange(changes: Record<string, { newValue?: unknown }>): void 
   if (STORAGE_KEYS.enabled in changes) {
     const value = changes[STORAGE_KEYS.enabled].newValue === true;
     if (value !== options.enabled) setEnabled(value, false);
+  }
+  if (STORAGE_KEYS.moietyRings in changes) {
+    const value = changes[STORAGE_KEYS.moietyRings].newValue !== false;
+    options = { ...options, moietyRings: value };
+    if (value && readerEl) {
+      void applyMoietyRings(readerEl);
+    } else if (!value && readerEl) {
+      applyMoieties(readerEl, {});
+    }
   }
 }
 

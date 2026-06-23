@@ -26,12 +26,13 @@ const area: FakeArea = {
 
 const { loadOptions, setOption, STORAGE_KEYS } = await import('../src/shared/options.js');
 
-test('loadOptions: everything is OFF by default (empty store)', async () => {
+test('loadOptions: defaults (empty store) — OFF for most, ON for moietyRings', async () => {
   store.clear();
   assert.deepEqual(await loadOptions(), {
     enabled: false,
     trimBlankEdges: false,
     condensed: false,
+    moietyRings: true,
   });
 });
 
@@ -65,5 +66,14 @@ test('STORAGE_KEYS are the stable glowficlog-namespaced strings', () => {
     enabled: 'glowficlog:enabled',
     trimBlankEdges: 'glowficlog:trimBlankEdges',
     condensed: 'glowficlog:condensed',
+    moietyRings: 'glowficlog:moietyRings',
   });
+});
+
+test('moietyRings defaults true when absent; setOption(false) persists false', async () => {
+  store.clear();
+  assert.equal((await loadOptions()).moietyRings, true, 'defaults true when absent');
+  await setOption('moietyRings', false);
+  assert.equal(store.get(STORAGE_KEYS.moietyRings), false, 'key written as false');
+  assert.equal((await loadOptions()).moietyRings, false, 'reads back false');
 });

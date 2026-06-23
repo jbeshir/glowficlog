@@ -20,10 +20,13 @@ all of that into one continuous, novel-like column.
   is restored **exactly** — the only DOM change is one CSS class on the original
   posts plus a single inserted reader node, both reverted on toggle-off.
 - Remembers your on/off choice in `storage.local`.
-- Has an **options page** (two toggles, applied live to open tabs): **trim blank
+- Has an **options page** (three toggles, applied live to open tabs): **trim blank
   lines** at the start/end of posts (whitespace-only lines, including
-  non-breaking spaces and empty paragraphs/line breaks), and a **super condensed
-  view** (hairline gaps between posts + tighter vertical padding).
+  non-breaking spaces and empty paragraphs/line breaks); a **super condensed
+  view** (hairline gaps between posts + tighter vertical padding); and **author
+  colour rings** (default ON — a subtle per-author colour ring around every icon,
+  so colour-coding persists on condensed repeat posts where the author name is
+  hidden; turning it off makes no network requests and shows no rings).
 - Is **defensive**: on any page where the expected glowfic selectors are absent,
   it does nothing and leaves the page untouched.
 
@@ -54,6 +57,10 @@ A **continuous, centred text column**:
   share a character name across **alts** that differ only by screenname/author,
   so whenever the writer behind a name changes the full identity is
   **re-announced** (and condensed again while it stays the same).
+- Each post's icon gets a subtle **per-author colour ring** (the "moiety" ring)
+  so colour-coding persists on condensed repeat posts where the author name is
+  hidden. The ring colour is fetched once per page from glowfic's own user API
+  and cached in-page.
 - Author-only out-of-character posts (`.spacer-alt`), the OP (`.post-post`),
   deleted characters (`[Deleted]`), deleted authors (`(deleted user)`), missing
   screennames, and iconless posts are all handled gracefully, in **both** the
@@ -75,14 +82,16 @@ src/reader-core/      ← pure, framework-free, shared by both consumers
   types.ts            Post model + options
   parse.ts            parsePosts(root) -> readonly Post[]   (immutable, null-guarded)
   render.ts           renderReader(posts, opts) -> HTMLElement  (pure, detached subtree)
-  reader.css          glr-scoped styles, CSS custom-property tunables
+  moiety.ts           applyMoieties(root, colorsByAuthor) — sets --glr-moiety CSS var
+  reader.css          glr-scoped styles, CSS custom-property tunables (incl. moiety ring)
   index.ts            public surface
 
 src/content/content.ts   Content script (consumer #1): toggle, storage, Alt+G,
                          hide/restore originals, applies options live. No UI framework.
+src/content/moiety.ts    Extension-only fetch/cache: fetchMoiety, applyMoietyRings.
 src/dev/harness.ts       Dev harness (consumer #2): renders fixtures offline,
                          driven by URL query params, shares reader-core.
-src/options/options.ts   Options page script (read/write the two option toggles).
+src/options/options.ts   Options page script (read/write the three option toggles).
 src/shared/options.ts    Shared option model, storage keys + helpers (content + options).
 public/dev/index.html    Harness shell (links reader.css + harness.js).
 public/options.html      Options page (links options.css + options.js).
@@ -171,11 +180,31 @@ Query parameters:
 | `raw`     | `1` / `true` to show the raw original side-by-side | off               |
 | `trim`    | `1` / `true` to trim blank lines at post edges     | off               |
 | `condensed` | `1` / `true` for the super-condensed density     | off               |
+| `moieties`  | `0` / `false` to disable author colour rings      | on (stub colours) |
 
 Fixtures are embedded into the harness bundle **at build time**, so the built
 `dist/dev/index.html` runs straight from `file://` — no server needed.
 
 ---
+
+## Network calls & permissions
+
+The **author colour rings** feature makes the extension's first (and only) network
+call: a same-origin `GET /api/v1/users?q=<author>&match=exact` from the content
+script to fetch each author's moiety colour. This call:
+
+- requires **no extra `manifest.json` permissions** — glowfic.com sends no
+  Content-Security-Policy, and a content-script same-origin request needs no
+  `host_permissions` entry under MV3;
+- degrades gracefully on failure (network error, `!response.ok`, or null moiety):
+  the icon shows no ring and a `console.warn` is emitted — the reader continues
+  working normally;
+- is gated on the **"author colour rings"** option (default ON): turning it off
+  makes zero network requests and clears all rings immediately.
+
+The **dev harness** never hits the network — it uses a deterministic offline stub
+(`stubMoiety`) that derives a colour from a stable hash of the author name, so
+`?moieties=` works offline.
 
 ## Selector assumptions & fragility
 

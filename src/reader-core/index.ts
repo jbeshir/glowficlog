@@ -26,3 +26,4 @@ export {
   HIDDEN_ORIGINAL_CLASS,
 } from './dom.js';
 export { enableIconPreviews } from './previews.js';
+export { applyMoieties } from './moiety.js';

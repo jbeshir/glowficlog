@@ -1,5 +1,37 @@
 # Changelog
 
+## v0.1.3-alpha — 2026-06-23
+
+### Reader
+
+- **Per-author moiety colour rings**: each post's icon now displays a subtle
+  coloured ring keyed to the author's moiety colour. The ring is pure CSS, driven
+  by the `--glr-moiety` custom property set on `.glr-icon-box` by the new
+  `applyMoieties` reader-core pass. Ring tunables (`--glr-moiety-ring: 2px`,
+  `--glr-moiety-gap: 2px`) live on `.glr-reader`; when the property is unset the
+  `box-shadow` is invalid at computed-value time and collapses to `none`, so no
+  ring appears without any helper class.
+
+### Extension
+
+- **Content-script moiety fetch** (`src/content/moiety.ts`): same-origin
+  `GET /api/v1/users?q=<author>&match=exact` (relative URL) fetches each author's
+  moiety colour once per page and caches it in-session. This is the extension's
+  **first network call**; it requires **no new `host_permissions`** (glowfic.com
+  sends no CSP; same-origin content-script requests are always allowed). On any
+  error the icon shows no ring and a `console.warn` is emitted — the reader
+  continues working normally.
+- **Default-ON "author colour rings" option**: new `moietyRings` toggle (default
+  `true`) in the options page. Turning it off makes zero network requests and
+  clears all rings immediately (`applyMoieties(reader, {})`).
+
+### Dev harness
+
+- **Offline deterministic stub**: the harness uses `stubMoiety(author)` — a stable
+  FNV-1a hash of the author name mapped to HSL — to colour rings with no network.
+  `?moieties=0` (or `?moieties=false`) disables rings; default is on. A "moiety
+  rings" checkbox is added to the toolbar mirroring the trim/condensed controls.
+
 ## v0.1.2-alpha — 2026-06-23
 
 ### Options page

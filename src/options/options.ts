@@ -20,6 +20,7 @@ async function init(): Promise<void> {
   const options = await loadOptions();
   bindToggle('opt-trim-blank-edges', 'trimBlankEdges', options.trimBlankEdges);
   bindToggle('opt-condensed', 'condensed', options.condensed);
+  bindToggle('opt-moiety-rings', 'moietyRings', options.moietyRings);
 }
 
 init().catch((err) => {

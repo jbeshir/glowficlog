@@ -13,8 +13,33 @@ import {
   layoutIcons,
   markSingleLineBodies,
   enableIconPreviews,
+  applyMoieties,
 } from '../reader-core/index.js';
 import type { FixtureMeta, ThemeVars } from '../reader-core/index.js';
+
+// Offline stand-in for the live /api/v1/users moiety lookup (no network in the harness).
+function stubMoiety(author: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < author.length; i++) {
+    hash ^= author.charCodeAt(i);
+    hash = (hash * 0x01000193) >>> 0;
+  }
+  const hue = hash % 360;
+  const s = 0.65;
+  const l = 0.55;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (hue < 60)       { r = c; g = x; b = 0; }
+  else if (hue < 120) { r = x; g = c; b = 0; }
+  else if (hue < 180) { r = 0; g = c; b = x; }
+  else if (hue < 240) { r = 0; g = x; b = c; }
+  else if (hue < 300) { r = x; g = 0; b = c; }
+  else                { r = c; g = 0; b = x; }
+  const toHex = (n: number): string => Math.round((n + m) * 255).toString(16).padStart(2, '0');
+  return '#' + toHex(r) + toHex(g) + toHex(b);
+}
 
 /** Host body typography fallback (matches reader.css / the real glowfic default
  *  post text), applied through the SAME applyTheme so the offline preview matches
@@ -75,6 +100,7 @@ interface ViewState {
   raw: boolean;
   trim: boolean;
   condensed: boolean;
+  moieties: boolean;
 }
 
 function boolParam(params: URLSearchParams, name: string): boolean {
@@ -95,6 +121,7 @@ function readState(): ViewState {
     raw: boolParam(params, 'raw'),
     trim: boolParam(params, 'trim'),
     condensed: boolParam(params, 'condensed'),
+    moieties: params.get('moieties') !== '0' && params.get('moieties') !== 'false',
   };
 }
 
@@ -105,6 +132,7 @@ function writeState(state: ViewState): void {
   if (state.raw) params.set('raw', '1');
   if (state.trim) params.set('trim', '1');
   if (state.condensed) params.set('condensed', '1');
+  if (!state.moieties) params.set('moieties', '0');
   const url = `${globalThis.location.pathname}?${params.toString()}`;
   globalThis.history.replaceState(null, '', url);
 }
@@ -163,6 +191,9 @@ function buildControls(state: ViewState, onChange: (next: ViewState) => void): H
   );
   bar.appendChild(
     checkbox('condensed', state.condensed, (v) => onChange({ ...state, condensed: v })),
+  );
+  bar.appendChild(
+    checkbox('moiety rings', state.moieties, (v) => onChange({ ...state, moieties: v })),
   );
 
   return bar;
@@ -274,6 +305,20 @@ function render(state: ViewState): void {
   layoutIcons(reader);
   // Same single-line body alignment pass the content script runs after insert.
   markSingleLineBodies(reader);
+  // Apply per-author moiety colour rings via the deterministic offline stub (no network).
+  if (state.moieties) {
+    const seen = new Set<string>();
+    const moietyMap: Record<string, string> = {};
+    for (const p of posts) {
+      if (p.author && p.author !== '(deleted user)' && !seen.has(p.author)) {
+        seen.add(p.author);
+        moietyMap[p.author] = stubMoiety(p.author);
+      }
+    }
+    applyMoieties(reader, moietyMap);
+  } else {
+    applyMoieties(reader, {});
+  }
   // Smooth floating icon previews, same code path as the extension.
   disablePreviews = enableIconPreviews(reader);
 }
