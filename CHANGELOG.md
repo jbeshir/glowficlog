@@ -4,6 +4,13 @@
 
 ### Reader
 
+- **Mobile reading layout** (`@media (max-width: 640px)`): below 640px the reader
+  switches from the alternating-gutter desktop layout to a single full-width
+  column in which each post's icon and author name float to the **right** and the
+  body text wraps around and below them. Icons keep a larger legible minimum size
+  (64px floor, vs the 28px desktop floor) so expressive headshots stay readable;
+  the gutter-based connector/band decorations are simplified into a per-post tint;
+  and the column runs edge-to-edge. Desktop layout above 640px is unchanged.
 - **Per-author moiety colour rings**: each post's icon now displays a subtle
   coloured ring keyed to the author's moiety colour. The ring is pure CSS, driven
   by the `--glr-moiety` custom property set on `.glr-icon-box` by the new
@@ -24,6 +31,8 @@
 - **Default-ON "author colour rings" option**: new `moietyRings` toggle (default
   `true`) in the options page. Turning it off makes zero network requests and
   clears all rings immediately (`applyMoieties(reader, {})`).
+- **Larger toggle button**: the floating Glowlog toggle is now at least 44×44 CSS
+  px (WCAG 2.5.5 enhanced target size).
 
 ### Dev harness
 
