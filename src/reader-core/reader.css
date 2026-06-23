@@ -429,8 +429,13 @@
   z-index: 2147483646;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 8px 12px;
+  /* WCAG 2.5.5 enhanced target size: at least 44x44 CSS px. */
+  min-height: 44px;
+  min-width: 44px;
+  box-sizing: border-box;
+  padding: 8px 16px;
   border: none;
   border-radius: 999px;
   background: #2563eb;
@@ -469,6 +474,13 @@
     --glr-icon-min: 64px;
   }
 
+  /* Drop the column's side padding so posts span the full viewport width;
+     each post keeps its own internal --glr-post-pad so text isn't flush to the edge. */
+  .glr-column {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
   /* Collapse the 3-col grid to one flow column AND contain the icon float. */
   .glr-post {
     display: flow-root;
@@ -500,6 +512,12 @@
     display: block;
     text-align: right;
     justify-content: initial;
+  }
+
+  /* display:block drops the flex gap, so restore the 6px spacing between the
+     inline name / screenname / author / permalink spans. */
+  .glr-identity > * + * {
+    margin-left: 6px;
   }
 
   /* Body text stays left-aligned so it wraps cleanly to the LEFT of the floated
