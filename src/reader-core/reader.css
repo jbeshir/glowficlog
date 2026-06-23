@@ -443,3 +443,94 @@
 .glr-toggle:hover { background: #1d4ed8; }
 .glr-toggle[aria-pressed="true"] { background: #047857; }
 .glr-toggle:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+/*
+ * ---- MOBILE LAYOUT (≤640px) -------------------------------------------------
+ * Alternative reading layout for narrow viewports, activated PURELY by this
+ * media query (no JS mode switch, no render option). Desktop (>640px) is
+ * untouched — every rule below is breakpoint-guarded.
+ *
+ * The 3-column grid collapses to ONE flowing column (display:flow-root, which
+ * also contains the icon float so a tall icon in post N never bleeds into post
+ * N+1). The icon box + identity name ALWAYS sit on the RIGHT (overriding the
+ * left/right alternation) and the body text FLOWS AROUND them by floating the
+ * icon arm right within the shared content area. The gutter-based, absolutely
+ * positioned band & connector are neutralised; the post's A/B stripe tint moves
+ * onto the post box itself (same opaque composite) so posts stay separable.
+ *
+ * The mobile icon floor is raised to 64px via --glr-icon-min; layoutIcons reads
+ * that custom property through getComputedStyle(.glr-reader), so this override
+ * flows through to the inline icon-box sizes the JS writes (re-read on the
+ * debounced resize when the breakpoint is crossed).
+ */
+@media (max-width: 640px) {
+  /* Legible icon floor on mobile; JS sizer reads this var off .glr-reader. */
+  .glr-reader {
+    --glr-icon-min: 64px;
+  }
+
+  /* Collapse the 3-col grid to one flow column AND contain the icon float. */
+  .glr-post {
+    display: flow-root;
+    grid-template-columns: none;
+    column-gap: 0;
+  }
+
+  /* Body becomes a full-width flow block (grid-column:2 is now inert). Keep its
+     internal padding; it must NOT establish a BFC, so text wraps around the
+     floated icon. */
+  .glr-body {
+    /* position:relative from desktop is harmless and kept; no override needed. */
+    padding: var(--glr-post-pad-y) var(--glr-post-pad);
+  }
+
+  /* Icon arm: out of absolute positioning, floated right for BOTH sides so the
+     icon always hangs top-right and body text wraps beside/below it. Inset
+     offsets from the desktop --left/--right rules are inert under position:static. */
+  .glr-arm {
+    position: static;
+    float: right;
+    z-index: auto;
+    margin: 0 0 8px 14px;
+  }
+
+  /* Name/identity sits with the icon at the top-right. display:block (not flex)
+     so its inline name spans wrap around the float instead of dodging it. */
+  .glr-identity {
+    display: block;
+    text-align: right;
+    justify-content: initial;
+  }
+
+  /* Body text stays left-aligned so it wraps cleanly to the LEFT of the floated
+     icon — neutralise the desktop single-line right-align (match its specificity). */
+  .glr-post--right.glr-body--single .glr-content,
+  .glr-content {
+    text-align: left;
+  }
+
+  /* Neutralise the gutter-based decorations: the connector has nothing to bridge
+     and the abs band references gutter geometry that no longer exists. */
+  .glr-connector,
+  .glr-band {
+    display: none;
+  }
+
+  /* Re-create the A/B stripe separation on the post box itself, using the SAME
+     opaque composite the band used, keyed on the article's existing stripe class.
+     Preserves the exact parity-based A/B distinction with no abs-positioned
+     artifacts. */
+  .glr-post.glr-stripe-a {
+    background: linear-gradient(var(--glr-stripe-a), var(--glr-stripe-a)), var(--glr-bg);
+    border-radius: var(--glr-radius);
+  }
+  .glr-post.glr-stripe-b {
+    background: linear-gradient(var(--glr-stripe-b), var(--glr-stripe-b)), var(--glr-bg);
+    border-radius: var(--glr-radius);
+  }
+
+  /* Restore the OP's leading accent rail (the desktop rule put it on the band). */
+  .glr-post--op {
+    box-shadow: inset 3px 0 0 0 var(--glr-chip-bg);
+  }
+}

@@ -412,6 +412,64 @@ test('gutter-arm tint follows the icon owner, not the adjacent text post', () =>
   }
 });
 
+// ---------------------------------------------------------------------------
+// phase03 — Render-structure regression guard
+// The mobile layout (reader.css @media max-width:640px) is CSS-only; the
+// rendered DOM must be identical to desktop. These assertions lock in:
+//   (a) each post's stripe class — the hook .glr-post.glr-stripe-{a|b} uses
+//   (b) the desktop DOM structure the mobile CSS overrides reference
+// ---------------------------------------------------------------------------
+test('mobile CSS hooks: stripe classes and desktop DOM structure are intact', () => {
+  const html = `
+    <div class="post-list">
+      <div class="post-container post-reply">
+        <div class="post-character">Alice</div>
+        <div class="post-author">Auth-A</div>
+        <div class="post-content"><p>Post one.</p></div>
+      </div>
+      <div class="post-container post-reply">
+        <div class="post-character">Bob</div>
+        <div class="post-author">Auth-B</div>
+        <div class="post-content"><p>Post two.</p></div>
+      </div>
+      <div class="post-container post-reply">
+        <div class="post-character">Alice</div>
+        <div class="post-author">Auth-A</div>
+        <div class="post-content"><p>Post three.</p></div>
+      </div>
+    </div>`;
+  const dom = domFor(html);
+  const doc = dom.window.document;
+  const reader = renderReader(parsePosts(doc), { document: doc });
+
+  const articles = Array.from(reader.querySelectorAll('.glr-post'));
+  assert.ok(articles.length >= 2, 'at least two posts rendered');
+
+  // (a) Each post carries exactly one stripe class.
+  for (const [i, article] of articles.entries()) {
+    const hasA = article.classList.contains('glr-stripe-a');
+    const hasB = article.classList.contains('glr-stripe-b');
+    assert.ok(hasA !== hasB, `post ${i} carries exactly one of glr-stripe-a / glr-stripe-b`);
+  }
+
+  // Both stripe variants present (parity alternation).
+  assert.ok(articles.some((el) => el.classList.contains('glr-stripe-a')), 'has glr-stripe-a post');
+  assert.ok(articles.some((el) => el.classList.contains('glr-stripe-b')), 'has glr-stripe-b post');
+
+  // (b) Desktop DOM structure is intact — mobile is CSS-only; no structural change expected.
+  for (const [i, article] of articles.entries()) {
+    assert.ok(article.querySelector('.glr-band'), `post ${i} has .glr-band`);
+    assert.ok(article.querySelector('.glr-connector'), `post ${i} has .glr-connector`);
+    const arm = article.querySelector('.glr-arm');
+    assert.ok(arm, `post ${i} has .glr-arm`);
+    assert.ok(arm!.querySelector('.glr-icon-box'), `post ${i} .glr-arm contains .glr-icon-box`);
+    const body = article.querySelector('.glr-body');
+    assert.ok(body, `post ${i} has .glr-body`);
+    assert.ok(body!.querySelector('.glr-identity'), `post ${i} .glr-body contains .glr-identity`);
+    assert.ok(body!.querySelector('.glr-content'), `post ${i} .glr-body contains .glr-content`);
+  }
+});
+
 test('defensive: empty / containerless roots return an empty frozen array', () => {
   const dom = domFor('<div>nothing here</div>');
   const posts = parsePosts(dom.window.document);

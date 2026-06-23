@@ -18,6 +18,10 @@ body[data-theme="dark"] {
   color: #e6e7ea;
 }
 
+/* The reader is fluid (width:100%, max-widths only, no blocking min-width). Its
+   mobile layout (reader.css @media (max-width:640px)) previews here simply by
+   narrowing the browser or devtools viewport below 640px — so the harness
+   chrome must not impose a min-width. */
 #app {
   max-width: 1400px;
   margin: 0 auto;

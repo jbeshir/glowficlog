@@ -88,6 +88,21 @@ test('fitIconBox: unknown natural size falls back to a square (pre-decode / mono
   assert.deepEqual(fitIconBox(100, 0, 96, 70), { w: 70, h: 70 });
 });
 
+test('fitIconBox: 64px mobile floor is reachable within a 96px-wide gutter', () => {
+  // gutter=112, pad=8 → maxImage = 112-2*8 = 96. With the mobile --glr-icon-min:64px
+  // the vertical budget is 64 and the gutter width is 96. A square icon must reach
+  // exactly 64×64, proving the 64px floor is not blocked by the gutter constraint.
+  const sq = fitIconBox(100, 100, 64, 96);
+  // scale = min(64/100, 96/100) = 0.64 → w = h = 64
+  assert.equal(sq.w, 64, 'square icon at 64px mobile floor fills the full 64px height budget');
+  assert.equal(sq.h, 64, '64px floor is reachable — not blocked by the 96px gutter width');
+
+  // Portrait (50×100): height binds first at 64; aspect preserved within both budgets.
+  const portrait = fitIconBox(50, 100, 64, 96);
+  assert.ok(portrait.h <= 64 + 1e-9, 'portrait height stays within the 64px vertical budget');
+  assertAspect(portrait.w, portrait.h, 50, 100);
+});
+
 // ---------------------------------------------------------------------------
 // computeIconSizes — pure geometry
 // ---------------------------------------------------------------------------
@@ -164,6 +179,32 @@ test('computeIconSizes: cap is the PRIMARY size whenever space allows', () => {
   // flowing segment. This is the cap-primary rule.
   const sizes = computeIconSizes([0, 500, 1000], 4000, OPTS);
   assert.deepEqual(sizes, [OPTS.cap, OPTS.cap, OPTS.cap], 'all icons at the cap');
+});
+
+test('computeIconSizes: a raised 64px mobile floor clamps tight spans to 64', () => {
+  // Mobile media query sets --glr-icon-min:64px. Tight same-side spans (30px apart,
+  // 8px clearance → available = 22px) must floor at 64, not the desktop ~26px default.
+  const sizes = computeIconSizes([0, 30, 60], 1000, { min: 64, cap: 96, gap: 8 });
+  // span[0]: nextTop=30, 30-0-8=22 < 64 → floors at 64 (not 26)
+  assert.equal(sizes[0], 64, 'tight span (22px) floors at the 64px mobile floor');
+  // span[1]: nextTop=60, 60-30-8=22 < 64 → floors at 64 (not 26)
+  assert.equal(sizes[1], 64, 'tight span (22px) floors at the 64px mobile floor');
+  // span[2]: nextTop=1000, 1000-60-8=932 > 96 → capped (floor is a minimum, not forced)
+  assert.equal(sizes[2], 96, 'last icon with ample room reaches the cap, not the floor');
+});
+
+test('computeIconSizes: min=64 raises icons that min=28 would floor lower', () => {
+  // Regression guard: the same tight geometry gives 28px with a near-default min but
+  // 64px with the mobile floor — directly encoding "the 64px floor raises small icons."
+  const tops = [0, 30, 60];
+  const containerBottom = 1000;
+  // span = 30-8 = 22: clamp(28,22,96)=28 vs clamp(64,22,96)=64.
+  const sized28 = computeIconSizes(tops, containerBottom, { min: 28, cap: 96, gap: 8 });
+  const sized64 = computeIconSizes(tops, containerBottom, { min: 64, cap: 96, gap: 8 });
+  assert.ok(sized64[0] >= 64, 'min=64 floor respected for index 0');
+  assert.ok(sized64[0] > sized28[0], 'min=64 raises icon above the min=28 floor at index 0');
+  assert.ok(sized64[1] >= 64, 'min=64 floor respected for index 1');
+  assert.ok(sized64[1] > sized28[1], 'min=64 raises icon above the min=28 floor at index 1');
 });
 
 // ---------------------------------------------------------------------------
@@ -301,6 +342,53 @@ test('layoutIcons: no posts is a safe no-op', () => {
   const dom = new JSDOM('<!DOCTYPE html><html><body><div class="glr-reader"><div class="glr-column"></div></div></body></html>');
   const reader = dom.window.document.querySelector('.glr-reader') as HTMLElement;
   assert.doesNotThrow(() => layoutIcons(reader));
+});
+
+test('layoutIcons: honors a CSS --glr-icon-min:64px override (mobile media-query path)', () => {
+  const { dom, reader } = readerWithPosts(6);
+  // Dense run: same-side icons 10px apart. With the DEFAULT ~26px floor the icon
+  // would be 26px; with --glr-icon-min:64px (the @media(max-width:640px) value) the
+  // box must floor at 64px. This proves the CSS-var path flows through end-to-end.
+  mockGeometry(reader, (_post, _side, i) => i * 10, 1000);
+
+  // jsdom returns '' for custom properties — that's why existing layoutIcons tests
+  // hit DEFAULT_ICON_OPTS fallbacks. Mock getComputedStyle for the reader root only
+  // to simulate the @media(max-width:640px){.glr-reader{--glr-icon-min:64px}} path.
+  const win = dom.window as unknown as Window & typeof globalThis;
+  const origGCS = win.getComputedStyle.bind(win);
+  const MOBILE_VARS: Record<string, string> = {
+    '--glr-icon-min': '64px',  // mobile floor — value the media query writes
+    '--glr-icon-cap': '96px',
+    '--glr-icon-gap': '8px',
+    '--glr-icon-pad': '8px',
+    '--glr-gutter':   '112px', // maxImage = 112-2*8 = 96 ≥ 64 → floor is reachable
+  };
+  win.getComputedStyle = ((el: Element) => {
+    if (el === reader) {
+      // Stub for the reader root: return mobile vars, '' for unrecognised props.
+      return {
+        getPropertyValue: (prop: string) => MOBILE_VARS[prop] ?? '',
+      } as CSSStyleDeclaration;
+    }
+    return origGCS(el);
+  }) as typeof win.getComputedStyle;
+
+  layoutIcons(reader);
+  win.getComputedStyle = origGCS; // restore so this stub doesn't bleed into later tests
+
+  // Left-side posts get tops [0,10,20]; clearance.gap = opts.gap+2*pad = 8+16 = 24.
+  // First non-last icon: span = 10-0-24 = -14 < 64 → sizes[0] = 64.
+  // fitIconBox(0, 0, 64, 96) → square fallback: min(64, 96) = 64 → {w:64, h:64}.
+  const leftPosts = Array.from(reader.querySelectorAll<HTMLElement>('.glr-post--left'));
+  const box = leftPosts[0].querySelector<HTMLElement>('.glr-icon-box')!;
+  assert.equal(
+    box.style.width, '64px',
+    'mobile --glr-icon-min:64px flows through layoutIcons: dense icon floors at 64, not 26',
+  );
+  assert.equal(
+    box.style.height, '64px',
+    'fitIconBox square fallback at min(maxH=64, maxW=96)=64 — 64px floor is reachable',
+  );
 });
 
 // ---------------------------------------------------------------------------
