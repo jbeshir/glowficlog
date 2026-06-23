@@ -20,6 +20,10 @@ all of that into one continuous, novel-like column.
   is restored **exactly** — the only DOM change is one CSS class on the original
   posts plus a single inserted reader node, both reverted on toggle-off.
 - Remembers your on/off choice in `storage.local`.
+- Has an **options page** (two toggles, applied live to open tabs): **trim blank
+  lines** at the start/end of posts (whitespace-only lines, including
+  non-breaking spaces and empty paragraphs/line breaks), and a **super condensed
+  view** (hairline gaps between posts + tighter vertical padding).
 - Is **defensive**: on any page where the expected glowfic selectors are absent,
   it does nothing and leaves the page untouched.
 
@@ -75,16 +79,19 @@ src/reader-core/      ← pure, framework-free, shared by both consumers
   index.ts            public surface
 
 src/content/content.ts   Content script (consumer #1): toggle, storage, Alt+G,
-                         hide/restore originals. No UI framework injected.
+                         hide/restore originals, applies options live. No UI framework.
 src/dev/harness.ts       Dev harness (consumer #2): renders fixtures offline,
                          driven by URL query params, shares reader-core.
+src/options/options.ts   Options page script (read/write the two option toggles).
+src/shared/options.ts    Shared option model, storage keys + helpers (content + options).
 public/dev/index.html    Harness shell (links reader.css + harness.js).
+public/options.html      Options page (links options.css + options.js).
 
 scripts/build.mjs        esbuild bundling + asset copy; embeds fixtures.
 scripts/package.mjs      web-ext (Firefox) + Chrome zip.
 scripts/gen-icons.mjs    regenerates the placeholder extension icons.
 test/reader-core.test.ts node:test + jsdom unit tests (the in-pipeline render proxy).
-fixtures/                7 real captured thread fixtures + manifest.json.
+fixtures/                8 real captured thread fixtures + manifest.json.
 ```
 
 - `parsePosts(root)` accepts any `ParentNode` containing `.post-container`
@@ -159,9 +166,11 @@ Query parameters:
 
 | Param     | Values                                            | Default            |
 |-----------|---------------------------------------------------|--------------------|
-| `fixture` | `dialogue-2author`, `multi-author-3plus`, `icon-heavy`, `mixed-iconless`, `long-infodump`, `icon-aspect`, `alts` | first fixture |
+| `fixture` | `dialogue-2author`, `multi-author-3plus`, `icon-heavy`, `mixed-iconless`, `long-infodump`, `icon-aspect`, `alts`, `blank-lines` | first fixture |
 | `theme`   | `light`, `dark`                                   | `light`            |
 | `raw`     | `1` / `true` to show the raw original side-by-side | off               |
+| `trim`    | `1` / `true` to trim blank lines at post edges     | off               |
+| `condensed` | `1` / `true` for the super-condensed density     | off               |
 
 Fixtures are embedded into the harness bundle **at build time**, so the built
 `dist/dev/index.html` runs straight from `file://` — no server needed.

@@ -96,5 +96,19 @@
     "avgPostChars": 247,
     "category": "alts",
     "notes": "Thread 4265 p40; 'Carissa Sevar' (lintamande) alternates screennames to-let-you-in / loves-her-strings — alt re-announcement test; 5 iconless posts"
+  },
+  {
+    "name": "blank-lines",
+    "file": "blank-lines.html",
+    "sourceUrl": "https://glowfic.com/posts/53995?page=5",
+    "view": "paginated",
+    "postCount": 26,
+    "distinctAuthors": 2,
+    "distinctCharacters": 4,
+    "hasIconlessPosts": false,
+    "hasAuthorOnlyPosts": false,
+    "avgPostChars": 331,
+    "category": "blank-lines",
+    "notes": "Thread 53995 p5; 6 posts carry blank-line spacers (<p>&nbsp;</p>) at the body edges — trim-blank-edges test"
   }
 ]

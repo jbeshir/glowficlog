@@ -17,7 +17,8 @@
   --glr-gutter: 112px;         /* icon gutter = icon cap (96px) + 2 × icon-pad (16px) */
   --glr-gap: 16px;             /* gap between gutter and body; also the connector length */
   --glr-post-gap: 16px;        /* vertical spacing BETWEEN posts (no dividers) */
-  --glr-post-pad: 18px;        /* comfortable internal padding of each post body (Req 4) */
+  --glr-post-pad: 18px;        /* horizontal internal padding of each post body (Req 4) */
+  --glr-post-pad-y: 18px;      /* vertical internal padding; condensed mode shrinks this */
   --glr-icon-pad: 8px;         /* symmetric padding around the icon in its tinted box (Req 1) */
   --glr-connector-h: 12px;     /* thickness of the thin icon→body connector (Req 1) */
   --glr-radius: 12px;          /* rounding of the icon box and the body rectangle */
@@ -107,10 +108,21 @@
   margin-top: var(--glr-post-gap);
 }
 
+/*
+ * Super-condensed view (opt-in via the options page). Collapses the inter-post
+ * spacing to a hairline and trims the vertical post padding to make a thread as
+ * dense as possible. Only spacing changes — the icon arm and connector both key
+ * off --glr-post-pad-y, so they stay aligned with the (now tighter) first line.
+ */
+.glr-reader.glr-condensed {
+  --glr-post-gap: 1px;
+  --glr-post-pad-y: 8px;
+}
+
 .glr-body {
   grid-column: 2;
   min-width: 0;
-  padding: var(--glr-post-pad);
+  padding: var(--glr-post-pad-y) var(--glr-post-pad);
 }
 
 /*
@@ -173,7 +185,7 @@
  */
 .glr-connector {
   position: absolute;
-  top: calc(var(--glr-post-pad) + 0.3em);
+  top: calc(var(--glr-post-pad-y) + 0.3em);
   height: var(--glr-connector-h);
   width: calc(var(--glr-icon-pad) + var(--glr-gap) + 6px);
   pointer-events: none;
@@ -196,7 +208,7 @@
  */
 .glr-arm {
   position: absolute;
-  top: var(--glr-post-pad);
+  top: var(--glr-post-pad-y);
   width: fit-content;
   height: fit-content;
   padding: var(--glr-icon-pad);

@@ -17,63 +17,22 @@ import {
   unmountReader,
   enableIconPreviews,
 } from '../reader-core/index.js';
-
-const STORAGE_KEY = 'glowficlog:enabled';
-
-// ---- WebExtension API (feature-detected; no @types/chrome dependency) ----
-
-interface StorageArea {
-  get(keys: string): Promise<Record<string, unknown>>;
-  set(items: Record<string, unknown>): Promise<void>;
-}
-interface BrowserLike {
-  storage?: { local?: StorageArea };
-}
-
-const ext: BrowserLike | undefined =
-  (globalThis as { browser?: BrowserLike }).browser ??
-  (globalThis as { chrome?: BrowserLike }).chrome;
-
-async function loadEnabled(): Promise<boolean> {
-  const area = ext?.storage?.local;
-  if (area) {
-    try {
-      const result = await area.get(STORAGE_KEY);
-      return result[STORAGE_KEY] === true;
-    } catch (err) {
-      console.warn('[glowficlog] storage.get failed; falling back', err);
-    }
-  }
-  try {
-    return globalThis.localStorage?.getItem(STORAGE_KEY) === 'true';
-  } catch {
-    return false;
-  }
-}
-
-async function saveEnabled(value: boolean): Promise<void> {
-  const area = ext?.storage?.local;
-  if (area) {
-    try {
-      await area.set({ [STORAGE_KEY]: value });
-      return;
-    } catch (err) {
-      console.warn('[glowficlog] storage.set failed; falling back', err);
-    }
-  }
-  try {
-    globalThis.localStorage?.setItem(STORAGE_KEY, String(value));
-  } catch {
-    /* localStorage may be unavailable (private mode); state is best-effort. */
-  }
-}
+import {
+  loadOptions,
+  setOption,
+  onOptionsChanged,
+  STORAGE_KEYS,
+  DEFAULT_OPTIONS,
+} from '../shared/options.js';
+import type { Options } from '../shared/options.js';
 
 // ---- Reader activation / restoration ----
 
 let readerEl: HTMLElement | null = null;
 let disablePreviews: (() => void) | null = null;
-let enabled = false;
 let toggleBtn: HTMLButtonElement | null = null;
+/** Last-known options; refreshed at init and on storage changes. */
+let options: Options = DEFAULT_OPTIONS;
 
 function detectTheme(): 'light' | 'dark' {
   try {
@@ -98,7 +57,13 @@ function activate(): void {
   const posts = parsePosts(document);
   if (posts.length === 0) return; // selectors absent → no-op
 
-  const reader = renderReader(posts, { document, theme: detectTheme() });
+  const reader = renderReader(posts, {
+    document,
+    theme: detectTheme(),
+    trimBlankEdges: options.trimBlankEdges,
+  });
+  // The super-condensed density mode is a single class on the reader root.
+  reader.classList.toggle('glr-condensed', options.condensed);
   // Colours AND typography follow the host glowfic theme (read BEFORE we hide the
   // originals, while their computed styles are still observable). Cheap, so
   // re-read on every (re)activation rather than caching.
@@ -144,27 +109,34 @@ function deactivate(): void {
   readerEl = null;
 }
 
+/** Rebuild the reader in place (used when an option changes how posts render). */
+function rebuild(): void {
+  if (!readerEl) return;
+  deactivate();
+  activate();
+}
+
 function reflectButton(): void {
   if (!toggleBtn) return;
-  toggleBtn.setAttribute('aria-pressed', String(enabled));
-  const label = enabled ? '📖 Glowlog: on' : '📖 Glowlog: off';
+  toggleBtn.setAttribute('aria-pressed', String(options.enabled));
+  const label = options.enabled ? '📖 Glowlog: on' : '📖 Glowlog: off';
   toggleBtn.textContent = label;
   toggleBtn.setAttribute('aria-label', label);
-  toggleBtn.title = enabled
+  toggleBtn.title = options.enabled
     ? 'Glowlog is on (Alt+G to toggle)'
     : 'Show the Glowlog compact reader (Alt+G)';
 }
 
 function setEnabled(value: boolean, persist: boolean): void {
-  enabled = value;
-  if (enabled) {
+  options = { ...options, enabled: value };
+  if (options.enabled) {
     activate();
   } else {
     deactivate();
   }
   reflectButton();
   if (persist) {
-    void saveEnabled(enabled);
+    void setOption('enabled', value);
   }
 }
 
@@ -174,7 +146,7 @@ function createToggle(): void {
   btn.className = 'glr-toggle';
   btn.type = 'button';
   btn.setAttribute('aria-pressed', 'false');
-  btn.addEventListener('click', () => setEnabled(!enabled, true));
+  btn.addEventListener('click', () => setEnabled(!options.enabled, true));
   document.body.appendChild(btn);
   toggleBtn = btn;
   reflectButton();
@@ -188,7 +160,28 @@ function onKeydown(event: KeyboardEvent): void {
   const tag = target?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
   event.preventDefault();
-  setEnabled(!enabled, true);
+  setEnabled(!options.enabled, true);
+}
+
+/** Apply changes pushed from the options page (or another tab) live. */
+function onStorageChange(changes: Record<string, { newValue?: unknown }>): void {
+  if (STORAGE_KEYS.condensed in changes) {
+    options = { ...options, condensed: changes[STORAGE_KEYS.condensed].newValue === true };
+    // Pure styling — just toggle the class, no rebuild needed.
+    readerEl?.classList.toggle('glr-condensed', options.condensed);
+  }
+  if (STORAGE_KEYS.trimBlankEdges in changes) {
+    options = {
+      ...options,
+      trimBlankEdges: changes[STORAGE_KEYS.trimBlankEdges].newValue === true,
+    };
+    // Changes how bodies render → rebuild so trimming is (un)applied.
+    rebuild();
+  }
+  if (STORAGE_KEYS.enabled in changes) {
+    const value = changes[STORAGE_KEYS.enabled].newValue === true;
+    if (value !== options.enabled) setEnabled(value, false);
+  }
 }
 
 async function init(): Promise<void> {
@@ -198,14 +191,14 @@ async function init(): Promise<void> {
   createToggle();
   document.addEventListener('keydown', onKeydown, true);
   globalThis.addEventListener?.('resize', onResize);
+  onOptionsChanged(onStorageChange);
 
-  // Restore remembered state (OFF by default).
-  const remembered = await loadEnabled();
-  if (remembered) {
-    setEnabled(true, false);
-  } else {
-    reflectButton();
+  // Restore remembered state (everything OFF by default).
+  options = await loadOptions();
+  if (options.enabled) {
+    activate();
   }
+  reflectButton();
 }
 
 init().catch((err) => {

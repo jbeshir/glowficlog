@@ -73,6 +73,18 @@ async function main() {
     legalComments: 'none',
   });
 
+  // Options page script — IIFE so it runs as a classic page script.
+  await build({
+    entryPoints: [r('src', 'options', 'options.ts')],
+    outfile: join(dist, 'options.js'),
+    bundle: true,
+    format: 'iife',
+    platform: 'browser',
+    target: TARGETS,
+    sourcemap: false,
+    legalComments: 'none',
+  });
+
   // Dev harness — IIFE with fixtures embedded via define (valid JS object literal).
   await build({
     entryPoints: [r('src', 'dev', 'harness.ts')],
@@ -90,6 +102,8 @@ async function main() {
 
   // Static assets.
   copyFileSync(r('manifest.json'), join(dist, 'manifest.json'));
+  copyFileSync(r('public', 'options.html'), join(dist, 'options.html'));
+  copyFileSync(r('public', 'options.css'), join(dist, 'options.css'));
   copyFileSync(r('src', 'reader-core', 'reader.css'), join(dist, 'reader.css'));
   copyFileSync(r('src', 'reader-core', 'reader.css'), join(dist, 'dev', 'reader.css'));
   copyFileSync(r('public', 'dev', 'index.html'), join(dist, 'dev', 'index.html'));

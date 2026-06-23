@@ -1,0 +1,87 @@
+/* glowficlog options page styling. Self-contained; respects the OS colour
+   scheme so it matches both the light and dark extension-management chrome. */
+
+:root {
+  --glo-bg: #ffffff;
+  --glo-fg: #1b1b1f;
+  --glo-muted: #5b5e66;
+  --glo-card: #f6f7f9;
+  --glo-border: #e3e6eb;
+  --glo-accent: #2563eb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --glo-bg: #16171b;
+    --glo-fg: #e6e7ea;
+    --glo-muted: #a2a6ad;
+    --glo-card: #1e2026;
+    --glo-border: #2a2c33;
+    --glo-accent: #7aa2ff;
+  }
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+  background: var(--glo-bg);
+  color: var(--glo-fg);
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.glo-page {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 28px 20px 40px;
+}
+
+.glo-title {
+  margin: 0 0 20px;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.glo-opt {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin: 0 0 14px;
+  padding: 14px 16px;
+  background: var(--glo-card);
+  border: 1px solid var(--glo-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.glo-check {
+  margin: 2px 0 0;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  accent-color: var(--glo-accent);
+  cursor: pointer;
+}
+
+.glo-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.glo-name {
+  font-weight: 600;
+}
+
+.glo-desc {
+  color: var(--glo-muted);
+  font-size: 0.9rem;
+}
+
+.glo-note {
+  margin: 18px 2px 0;
+  color: var(--glo-muted);
+  font-size: 0.85rem;
+}

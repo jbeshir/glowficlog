@@ -18,6 +18,7 @@
 // `glr-` prefixed.
 
 import type { Post, RenderOptions } from './types.js';
+import { trimBlankEdges } from './bodytrim.js';
 
 const NS = 'glr';
 
@@ -95,7 +96,7 @@ const STRIP_TAGS = new Set(['SCRIPT', 'IFRAME', 'OBJECT', 'EMBED', 'STYLE', 'LIN
  * active/dangerous content. The body markup originates from the host page (or a
  * saved fixture), so this is defence-in-depth, not a trust boundary.
  */
-function buildBody(doc: Document, bodyHtml: string): HTMLElement {
+function buildBody(doc: Document, bodyHtml: string, trim: boolean): HTMLElement {
   const body = el(doc, 'div', `${NS}-content`);
   body.innerHTML = bodyHtml;
   // Remove disallowed elements.
@@ -118,6 +119,8 @@ function buildBody(doc: Document, bodyHtml: string): HTMLElement {
       }
     }
   }
+  // Optionally drop whitespace-only lines from the top/bottom of the post.
+  if (trim) trimBlankEdges(body);
   return body;
 }
 
@@ -232,6 +235,7 @@ export function renderReader(
 ): HTMLElement {
   const doc = resolveDocument(options);
   const theme = options.theme ?? 'light';
+  const trim = options.trimBlankEdges ?? false;
 
   const root = el(doc, 'div', `${NS}-reader`);
   root.setAttribute('data-theme', theme);
@@ -278,7 +282,7 @@ export function renderReader(
 
     const body = el(doc, 'div', `${NS}-body`);
     body.appendChild(buildIdentity(doc, post, isFirst));
-    body.appendChild(buildBody(doc, post.bodyHtml));
+    body.appendChild(buildBody(doc, post.bodyHtml, trim));
     article.appendChild(body);
 
     column.appendChild(article);

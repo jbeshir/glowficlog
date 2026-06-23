@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>glowficlog options</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="glo-page">
+      <h1 class="glo-title">glowficlog options</h1>
+
+      <label class="glo-opt">
+        <input type="checkbox" id="opt-trim-blank-edges" class="glo-check" />
+        <span class="glo-text">
+          <span class="glo-name">Trim blank lines at the start and end of posts</span>
+          <span class="glo-desc">
+            Removes whitespace-only lines — including non-breaking spaces and
+            empty paragraphs or line breaks — from the top and bottom of each
+            post. Blank lines between content are left alone.
+          </span>
+        </span>
+      </label>
+
+      <label class="glo-opt">
+        <input type="checkbox" id="opt-condensed" class="glo-check" />
+        <span class="glo-text">
+          <span class="glo-name">Super condensed view</span>
+          <span class="glo-desc">
+            Shrinks the gap between posts to a hairline and trims the top and
+            bottom padding inside each post, for maximum density.
+          </span>
+        </span>
+      </label>
+
+      <p class="glo-note">Changes apply immediately to open glowfic tabs.</p>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>

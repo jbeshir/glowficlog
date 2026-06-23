@@ -34,6 +34,8 @@ export interface RenderOptions {
   readonly document?: Document;
   /** Theme applied as `data-theme` on the root. */
   readonly theme?: 'light' | 'dark';
+  /** Trim whitespace-only lines from the start/end of each post body. */
+  readonly trimBlankEdges?: boolean;
 }
 
 /** Shape of one entry in fixtures/manifest.json (subset the harness/tests rely on). */

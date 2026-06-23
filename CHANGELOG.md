@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.1.2-alpha — 2026-06-23
+
+### Options page
+
+- Adds an extension **options page** (two toggles, applied live to open tabs):
+  - **Trim blank lines at the start/end of posts** — removes whitespace-only
+    lines, including non-breaking spaces and empty paragraphs / line breaks,
+    from the top and bottom of each post (blank lines between content are kept).
+  - **Super condensed view** — shrinks the gap between posts to a hairline and
+    trims the top/bottom padding inside each post.
+
+### Dev
+
+- New captured fixture `blank-lines` (thread 53995 p5) for the trim option, and
+  `trim` / `condensed` toggles in the dev harness.
+
 ## v0.1.1-alpha — 2026-06-22
 
 ### Reader

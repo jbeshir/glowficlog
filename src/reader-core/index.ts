@@ -3,6 +3,7 @@
 export type { Post, RenderOptions, FixtureMeta } from './types.js';
 export { parsePosts } from './parse.js';
 export { renderReader, computeFullAppearances } from './render.js';
+export { trimBlankEdges, isBlankNode } from './bodytrim.js';
 export type { ThemeVars } from './theme.js';
 export { readThemeFromDocument, applyTheme, withAlpha, isTransparent } from './theme.js';
 export type { IconSizeOpts, SingleLineInput, IconBox } from './layout.js';
