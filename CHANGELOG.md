@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.1.4-alpha — 2026-06-24
+
+Packaging / distribution only — no reader or content-script behaviour changes.
+
+### Store readiness
+
+- **Manifest keys for AMO + Firefox-for-Android**: stable add-on id
+  `glowficlog@beshir.org` (was the placeholder `glowficlog@glowficlog.local`);
+  `data_collection_permissions: { required: ["none"] }` nested under `gecko` to
+  declare zero data collection; and `gecko_android.strict_min_version: "128.0"`
+  to make the extension installable on Firefox for Android (MV3 landed in
+  Firefox-Android 128). Desktop `strict_min_version` stays at `115.0` for maximum
+  reach including ESR. Single shared manifest — Chrome ignores
+  `browser_specific_settings`.
+- **Dev harness no longer bundled in the packaged extension**: `web-ext build`
+  and `web-ext lint` now ignore `dev/**`, so the shipped zips contain only the
+  reader runtime (no offline harness). The harness is still built into `dist/dev/`
+  for local development.
+- **Reproducible builds for AMO source review**: committed `package-lock.json`
+  (install with `npm ci`) and a reviewer build guide at `docs/BUILDING.md`.
+
 ## v0.1.3-alpha — 2026-06-23
 
 ### Reader

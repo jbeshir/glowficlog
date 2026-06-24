@@ -1,6 +1,5 @@
-# dependencies (provided pre-installed; never committed)
+# dependencies (node_modules/ is not committed; package-lock.json is committed)
 node_modules/
-package-lock.json
 
 # build output
 dist/

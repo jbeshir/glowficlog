@@ -116,8 +116,9 @@ fixtures/                8 real captured thread fixtures + manifest.json.
 
 ## Build & validate
 
-Dependencies are pinned and **pre-installed**; never run `npm install`. All tools
-are local; there is no network requirement.
+Dependencies are pinned via a committed `package-lock.json`; install with `npm ci`
+(no network needed beyond that initial install). See `docs/BUILDING.md` for the
+full reproducible-build and packaging guide.
 
 ```bash
 make build       # bundle everything into dist/

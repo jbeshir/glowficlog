@@ -1,4 +1,4 @@
-# glowficlog — thin wrappers over npm scripts (deps are pre-installed; never `npm install`).
+# glowficlog — thin wrappers over npm scripts. Reviewers/CI install pinned deps with `npm ci` (committed package-lock.json).
 NPM := npm run --silent
 
 .PHONY: all build dev lint lint-ext typecheck test validate package clean

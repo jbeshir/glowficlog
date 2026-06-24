@@ -26,9 +26,12 @@ const webExt = join(root, 'node_modules', '.bin', 'web-ext');
 // Clean previous artifacts so we can reliably pick up the fresh one.
 rmSync(artifacts, { recursive: true, force: true });
 
+// dev/ is the offline harness — exclude it (and its now-empty dir entry) from
+// the shipped artifact. `dev/**` drops the files; `dev` drops the bare folder.
 execFileSync(
   webExt,
-  ['build', '--source-dir', dist, '--artifacts-dir', artifacts, '--overwrite-dest'],
+  ['build', '--source-dir', dist, '--artifacts-dir', artifacts, '--overwrite-dest',
+    '--ignore-files', 'dev/**', '--ignore-files', 'dev'],
   { stdio: 'inherit' },
 );
 
