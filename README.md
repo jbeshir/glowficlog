@@ -98,7 +98,7 @@ public/options.html      Options page (links options.css + options.js).
 
 scripts/build.mjs        esbuild bundling + asset copy; embeds fixtures.
 scripts/package.mjs      web-ext (Firefox) + Chrome zip.
-scripts/gen-icons.mjs    regenerates the placeholder extension icons.
+icons/icon.svg           Source for the toolbar/store icons (rendered to icon-16/48/128.png).
 test/reader-core.test.ts node:test + jsdom unit tests (the in-pipeline render proxy).
 fixtures/                8 real captured thread fixtures + manifest.json.
 ```

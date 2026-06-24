@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .t0 { stop-color: #a4243b } .t1 { stop-color: #7d1b2b }
+    .cream { fill: #fdf2e0 } .gold { fill: #f1c453 }
+    @media (prefers-color-scheme: dark) {
+      .t0 { stop-color: #c33049 } .t1 { stop-color: #8f2030 }
+      .cream { fill: #fff4e2 } .gold { fill: #ffd166 }
+    }
+  </style>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" class="t0"/><stop offset="1" class="t1"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="30" height="30" rx="7" fill="url(#tile)"/>
+  <!-- back bubble (first voice, cream) -->
+  <rect x="4.5" y="7" width="15.5" height="10.5" rx="3.6" class="cream"/>
+  <path class="cream" d="M8 16.5 L8 21 L12.5 16.5 Z"/>
+  <!-- front bubble (second voice, gold) -->
+  <rect x="13.5" y="13.5" width="13.5" height="9" rx="3.2" class="gold"/>
+  <path class="gold" d="M23.5 21.5 L23.5 25 L19 21.5 Z"/>
+  <!-- sparkles: the glowfic glow -->
+  <path class="gold" d="M24.5 3.9 L25.14 6.16 L27.4 6.8 L25.14 7.44 L24.5 9.7 L23.86 7.44 L21.6 6.8 L23.86 6.16 Z"/>
+  <path class="gold" d="M28 9.6 L28.31 10.69 L29.4 11 L28.31 11.31 L28 12.4 L27.69 11.31 L26.6 11 L27.69 10.69 Z"/>
+</svg>
