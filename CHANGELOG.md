@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.1.6-alpha — 2026-06-26
+
+### Reader
+
+- **Remove non-functional body sanitisation**: `buildBody` previously stripped
+  `<script>`/`<iframe>`/etc. elements, inline `on*` handlers, and `javascript:`
+  URLs from post bodies after inserting them. Post bodies are glowfic.com's own
+  already-rendered, same-origin markup — re-displaying them runs nothing the page
+  did not already run, and `innerHTML` never executes `<script>` — so that guard
+  enforced no real boundary while implying one (and could mislead future work
+  about where the trust boundary sits). Removed it; the body is re-displayed
+  as-is, with only the optional blank-edge trim applied. glowfic is the trust
+  boundary.
+
 ## v0.1.5-alpha — 2026-06-26
 
 ### Reader / UX

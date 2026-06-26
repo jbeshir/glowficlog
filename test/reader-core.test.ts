@@ -301,19 +301,14 @@ test('absence variants: every edge case parses without throwing', () => {
   assert.equal(deleted.screenname, null);
   assert.equal(deleted.iconUrl, null);
 
-  // Render must not throw and must neutralise scripts / inline handlers.
+  // Render must not throw on any of these edge cases (including a post body
+  // carrying a <script>, an inline handler, and a javascript: href — the reader
+  // re-displays glowfic's own same-origin markup as-is and does not sanitise it).
   let reader!: HTMLElement;
   assert.doesNotThrow(() => {
     reader = renderReader(posts, { document: doc });
   });
   assert.equal(reader.querySelectorAll('.glr-post').length, 6);
-  assert.equal(reader.querySelectorAll('script').length, 0, 'scripts stripped from body');
-  const bad = reader.querySelector('.glr-content [onclick]');
-  assert.equal(bad, null, 'inline handlers stripped');
-  const badHref = Array.from(reader.querySelectorAll('.glr-content a')).find((a) =>
-    /javascript:/i.test(a.getAttribute('href') ?? ''),
-  );
-  assert.equal(badHref, undefined, 'javascript: hrefs stripped');
 
   // Reader default theme is light.
   assert.equal(reader.getAttribute('data-theme'), 'light');

@@ -89,36 +89,16 @@ function initialFor(post: Post): string {
   return ch.toUpperCase();
 }
 
-const STRIP_TAGS = new Set(['SCRIPT', 'IFRAME', 'OBJECT', 'EMBED', 'STYLE', 'LINK', 'META', 'BASE']);
-
 /**
- * Build the post body node from raw HTML using the injected document, removing
- * active/dangerous content. The body markup originates from the host page (or a
- * saved fixture), so this is defence-in-depth, not a trust boundary.
+ * Build the post body node from raw HTML using the injected document. The markup
+ * is the glowfic.com page's own already-rendered, same-origin content (or a saved
+ * fixture in the dev harness), so the reader re-displays it as-is: re-inserting it
+ * runs nothing the page did not already run, and `innerHTML` never executes
+ * `<script>`. The only transform is the optional blank-edge trim.
  */
 function buildBody(doc: Document, bodyHtml: string, trim: boolean): HTMLElement {
   const body = el(doc, 'div', `${NS}-content`);
   body.innerHTML = bodyHtml;
-  // Remove disallowed elements.
-  for (const node of Array.from(body.querySelectorAll('*'))) {
-    if (STRIP_TAGS.has(node.tagName)) {
-      node.remove();
-      continue;
-    }
-    // Strip inline event handlers and javascript: URLs.
-    for (const attr of Array.from(node.attributes)) {
-      const name = attr.name.toLowerCase();
-      const value = attr.value;
-      if (name.startsWith('on')) {
-        node.removeAttribute(attr.name);
-      } else if (
-        (name === 'href' || name === 'src' || name === 'xlink:href') &&
-        /^\s*javascript:/i.test(value)
-      ) {
-        node.removeAttribute(attr.name);
-      }
-    }
-  }
   // Optionally drop whitespace-only lines from the top/bottom of the post.
   if (trim) trimBlankEdges(body);
   return body;

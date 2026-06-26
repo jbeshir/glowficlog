@@ -235,9 +235,12 @@ These class names are hand-authored and stable in the glowfic source, but no
 scraper is future-proof. If the reader ever shows nothing, glowfic's markup has
 likely changed and the selectors in `src/reader-core/parse.ts` need updating.
 
-Post body HTML is reinserted from the host page (or fixture). As defence in depth
-the renderer strips `<script>`/`<iframe>`/etc., inline `on*` handlers and
-`javascript:` URLs before inserting it.
+Post body HTML is reinserted from the host page (or fixture). This is
+glowfic.com's own already-rendered, same-origin markup, so the reader re-displays
+it as-is — re-inserting it runs nothing the page did not already run, and
+`innerHTML` never executes `<script>`. glowfic is the trust boundary; the reader
+adds no sanitisation layer (one would enforce no real boundary while implying
+one).
 
 ## License
 
