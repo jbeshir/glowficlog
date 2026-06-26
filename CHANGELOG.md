@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.1.5-alpha — 2026-06-25
+## v0.1.5-alpha — 2026-06-26
 
 ### Reader / UX
 
@@ -21,6 +21,14 @@
   to `*://glowfic.com/*` and `*://www.glowfic.com/*`, enabling the content script
   to navigate to it via `runtime.getURL()` + `window.open()`. No background
   script is added; `permissions` stays `["storage"]`; no new network calls.
+
+### Icons
+
+- **Transparent icon background**: the toolbar/store icons
+  (`icons/icon-{16,48,128}.png`) are re-rendered from `icon.svg` with a
+  transparent background instead of a baked-in opaque white square, so the rounded
+  rose tile blends into any surface (previously Firefox's add-ons panel showed a
+  white frame around it).
 
 ## v0.1.4-alpha — 2026-06-24
 
