@@ -241,4 +241,4 @@ the renderer strips `<script>`/`<iframe>`/etc., inline `on*` handlers and
 
 ## License
 
-Unlicensed sample/build project.
+[MIT](LICENSE) © 2026 John Beshir.
