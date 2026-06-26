@@ -15,6 +15,8 @@ all of that into one continuous, novel-like column.
 ## What it does
 
 - Adds a floating **toggle** (bottom-right, or **Alt+G**) to glowfic thread pages.
+  When the reader is on, a **settings button** (🔧) appears beside the toggle;
+  clicking it opens the options page in a new tab.
 - **OFF by default.** When you turn it on, the original posts are hidden (not
   removed) and a compact reader is shown in their place. Turn it off and the page
   is restored **exactly** — the only DOM change is one CSS class on the original
@@ -206,6 +208,11 @@ script to fetch each author's moiety colour. This call:
 The **dev harness** never hits the network — it uses a deterministic offline stub
 (`stubMoiety`) that derives a colour from a stable hash of the author name, so
 `?moieties=` works offline.
+
+`options.html` is declared as a `web_accessible_resource` in `manifest.json`
+(scoped to `glowfic.com` and `www.glowfic.com`), so the content script can open
+it in a new tab via `runtime.getURL()` + `window.open()`. No background script is
+required; `permissions` stays `["storage"]`; no new network calls are made.
 
 ## Selector assumptions & fragility
 

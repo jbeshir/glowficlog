@@ -19,6 +19,8 @@ import {
   applyMoieties,
 } from '../reader-core/index.js';
 import { applyMoietyRings } from './moiety.js';
+import { createControls, type Controls } from './controls.js';
+import { openOptionsPage } from './open-options.js';
 import {
   loadOptions,
   setOption,
@@ -32,7 +34,7 @@ import type { Options } from '../shared/options.js';
 
 let readerEl: HTMLElement | null = null;
 let disablePreviews: (() => void) | null = null;
-let toggleBtn: HTMLButtonElement | null = null;
+let controls: Controls | null = null;
 /** Last-known options; refreshed at init and on storage changes. */
 let options: Options = DEFAULT_OPTIONS;
 
@@ -122,14 +124,7 @@ function rebuild(): void {
 }
 
 function reflectButton(): void {
-  if (!toggleBtn) return;
-  toggleBtn.setAttribute('aria-pressed', String(options.enabled));
-  const label = options.enabled ? '📖 Glowlog: on' : '📖 Glowlog: off';
-  toggleBtn.textContent = label;
-  toggleBtn.setAttribute('aria-label', label);
-  toggleBtn.title = options.enabled
-    ? 'Glowlog is on (Alt+G to toggle)'
-    : 'Show the Glowlog compact reader (Alt+G)';
+  controls?.reflect(options.enabled);
 }
 
 function setEnabled(value: boolean, persist: boolean): void {
@@ -145,15 +140,13 @@ function setEnabled(value: boolean, persist: boolean): void {
   }
 }
 
-function createToggle(): void {
-  if (toggleBtn) return;
-  const btn = document.createElement('button');
-  btn.className = 'glr-toggle';
-  btn.type = 'button';
-  btn.setAttribute('aria-pressed', 'false');
-  btn.addEventListener('click', () => setEnabled(!options.enabled, true));
-  document.body.appendChild(btn);
-  toggleBtn = btn;
+function mountControls(): void {
+  if (controls) return;
+  controls = createControls(document, {
+    onToggle: () => setEnabled(!options.enabled, true),
+    onOpenOptions: () => openOptionsPage(),
+  });
+  document.body.appendChild(controls.container);
   reflectButton();
 }
 
@@ -202,7 +195,7 @@ async function init(): Promise<void> {
   // Bail out completely on non-thread pages — leave the page untouched.
   if (!isThreadPage()) return;
 
-  createToggle();
+  mountControls();
   document.addEventListener('keydown', onKeydown, true);
   globalThis.addEventListener?.('resize', onResize);
   onOptionsChanged(onStorageChange);

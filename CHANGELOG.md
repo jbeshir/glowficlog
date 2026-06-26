@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.1.5-alpha — 2026-06-25
+
+### Reader / UX
+
+- **Settings button (spanner)**: when the reader is on, a 🔧 button appears
+  immediately to the left of the toggle in the same fixed bottom-right cluster.
+  Clicking it opens the options page in a new tab. The button is hidden when the
+  reader is off; it shows and hides in lockstep with the toggle state via the
+  shared `reflect()` call — no extra wiring needed.
+- **Floating control cluster** (`.glr-controls`): the toggle and spanner are now
+  grouped in a `position:fixed` flex container (`z-index: 2147483646`). The
+  toggle loses its own positioning properties and inherits placement from the
+  container. Mobile layout (`≤ 640px`) keeps the cluster at `right:12px;
+  bottom:12px` to mirror the desktop inset.
+
+### Manifest
+
+- **`web_accessible_resources`**: `options.html` is now web-accessible and scoped
+  to `*://glowfic.com/*` and `*://www.glowfic.com/*`, enabling the content script
+  to navigate to it via `runtime.getURL()` + `window.open()`. No background
+  script is added; `permissions` stays `["storage"]`; no new network calls.
+
 ## v0.1.4-alpha — 2026-06-24
 
 Packaging / distribution only — no reader or content-script behaviour changes.

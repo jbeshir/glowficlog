@@ -26,6 +26,12 @@
       "run_at": "document_idle"
     }
   ],
+  "web_accessible_resources": [
+    {
+      "resources": ["options.html"],
+      "matches": ["*://glowfic.com/*", "*://www.glowfic.com/*"]
+    }
+  ],
   "browser_specific_settings": {
     "gecko": {
       "id": "glowficlog@beshir.org",

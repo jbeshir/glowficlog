@@ -432,12 +432,19 @@
   display: none !important;
 }
 
-/* Floating toggle button injected by the content script. */
-.glr-toggle {
+/* Floating control cluster (spanner + toggle) injected by the content script. */
+.glr-controls {
   position: fixed;
   right: 16px;
   bottom: 16px;
   z-index: 2147483646;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.glr-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -459,6 +466,31 @@
 .glr-toggle:hover { background: #1d4ed8; }
 .glr-toggle[aria-pressed="true"] { background: #047857; }
 .glr-toggle:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+.glr-spanner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+  box-sizing: border-box;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.glr-spanner:hover { background: #1d4ed8; }
+.glr-spanner:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+/* .glr-spanner sets display:inline-flex (specificity 0,1,0); the UA [hidden]
+   rule is also 0,1,0 but UA loses to author, so the element would stay visible
+   even when hidden=true. This 0,2,0 rule restores the intended hide behaviour. */
+.glr-spanner[hidden] { display: none; }
 
 /*
  * ---- MOBILE LAYOUT (≤640px) -------------------------------------------------
@@ -562,4 +594,8 @@
   .glr-post--op {
     box-shadow: inset 3px 0 0 0 var(--glr-chip-bg);
   }
+
+  /* Keep the control cluster reachable on narrow screens; two 44px buttons +
+     8px gap (≈ 96px total) fit comfortably within any 320px+ viewport. */
+  .glr-controls { right: 12px; bottom: 12px; gap: 8px; }
 }
