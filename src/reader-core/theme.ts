@@ -215,3 +215,39 @@ export function applyTheme(rootEl: HTMLElement, vars: ThemeVars): void {
     set('--glr-chip-bg', withAlpha(vars.link, 0.16));
   }
 }
+
+/**
+ * Subscribe to live OS colour-scheme changes. Calls `onChange('dark' | 'light')`
+ * whenever `prefers-color-scheme` flips at runtime, so a caller that follows the OS
+ * theme can re-theme without a reload. Returns an unsubscribe function; it is a
+ * no-op when `matchMedia` is unavailable (e.g. under jsdom), so callers never need
+ * to feature-detect. The listener is fully removable, so it leaks nothing when the
+ * caller tears down.
+ *
+ * Uses the modern `addEventListener('change', …)` where present and falls back to
+ * the deprecated `addListener` for older WebKit/Safari, mirroring the cross-browser
+ * stance of the rest of the extension.
+ */
+export function watchSystemTheme(onChange: (theme: 'light' | 'dark') => void): () => void {
+  let queried: MediaQueryList | undefined;
+  try {
+    queried = globalThis.matchMedia?.('(prefers-color-scheme: dark)');
+  } catch {
+    /* matchMedia may throw or be absent — treat as "no live updates available". */
+  }
+  if (!queried) return () => {};
+  // Bind to a const so the non-undefined narrowing holds inside the closures below.
+  const mql = queried;
+
+  const handler = (event: MediaQueryListEvent): void => {
+    onChange(event.matches ? 'dark' : 'light');
+  };
+
+  if (typeof mql.addEventListener === 'function') {
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }
+  // Legacy API (deprecated, but the only option on older WebKit).
+  mql.addListener(handler);
+  return () => mql.removeListener(handler);
+}

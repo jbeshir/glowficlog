@@ -17,6 +17,7 @@ import {
   unmountReader,
   enableIconPreviews,
   applyMoieties,
+  watchSystemTheme,
 } from '../reader-core/index.js';
 import { applyMoietyRings } from './moiety.js';
 import { createControls, type Controls } from './controls.js';
@@ -35,6 +36,12 @@ import type { Options } from '../shared/options.js';
 let readerEl: HTMLElement | null = null;
 let disablePreviews: (() => void) | null = null;
 let controls: Controls | null = null;
+/** Unsubscribe for the storage-change listener; content-script-lifetime (it must
+ *  survive reader on/off toggles so cross-context re-enables still arrive), so it
+ *  is released only in {@link teardown}, never in deactivate(). */
+let unsubscribeOptions: (() => void) | null = null;
+/** Remover for the live OS dark/light listener; released in {@link teardown}. */
+let unwatchSystemTheme: (() => void) | null = null;
 /** Last-known options; refreshed at init and on storage changes. */
 let options: Options = DEFAULT_OPTIONS;
 
@@ -191,21 +198,55 @@ function onStorageChange(changes: Record<string, { newValue?: unknown }>): void 
   }
 }
 
+/** Release every content-script-lifetime listener and tear the reader down. There
+ *  is no built-in content-script teardown on glowfic (full page loads), so this is
+ *  wired to a real-unload `pagehide` only; it exists so nothing leaks if the page
+ *  is genuinely navigated away. Safe to call more than once. */
+function teardown(): void {
+  document.removeEventListener('keydown', onKeydown, true);
+  globalThis.removeEventListener?.('resize', onResize);
+  globalThis.removeEventListener?.('pagehide', onPageHide);
+  if (unsubscribeOptions) {
+    unsubscribeOptions();
+    unsubscribeOptions = null;
+  }
+  if (unwatchSystemTheme) {
+    unwatchSystemTheme();
+    unwatchSystemTheme = null;
+  }
+  deactivate();
+}
+
+/** Real navigation away → tear down. Skip bfcache suspends (`event.persisted`) so a
+ *  page restored from the back/forward cache keeps its listeners and still works. */
+function onPageHide(event: PageTransitionEvent): void {
+  if (!event.persisted) teardown();
+}
+
 async function init(): Promise<void> {
   // Bail out completely on non-thread pages — leave the page untouched.
   if (!isThreadPage()) return;
 
-  mountControls();
   document.addEventListener('keydown', onKeydown, true);
   globalThis.addEventListener?.('resize', onResize);
-  onOptionsChanged(onStorageChange);
+  // Capture the unsubscribe (previously discarded) so the listener is releasable.
+  unsubscribeOptions = onOptionsChanged(onStorageChange);
+  // Live OS dark/light flips: there is no explicit light/dark option, so the reader
+  // always follows the OS — every flip rebuilds, which re-derives data-theme (via
+  // detectTheme → renderReader) and re-samples the host colours. Removed in teardown.
+  unwatchSystemTheme = watchSystemTheme(() => {
+    if (readerEl) rebuild();
+  });
+  globalThis.addEventListener?.('pagehide', onPageHide);
 
-  // Restore remembered state (everything OFF by default).
+  // Restore remembered state (everything OFF by default). Load BEFORE mounting the
+  // controls so the toggle button paints in its correct on/off state on first frame
+  // (no flash of the default 'off' label — FOUC fix).
   options = await loadOptions();
+  mountControls();
   if (options.enabled) {
     activate();
   }
-  reflectButton();
 }
 
 init().catch((err) => {

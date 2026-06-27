@@ -637,3 +637,88 @@ test('fixture alts: the alternating-screenname character re-announces each switc
     prevScreen = p.screenname;
   });
 });
+
+// ---------------------------------------------------------------------------
+// phase03 (P8) — parser edge-case robustness
+//   (a) a bare `id="reply-"` (prefix, no numeric suffix) must not yield an empty
+//       id — it falls through to the positional `pos-{index}` fallback.
+//   (b) two replies sharing the SAME numeric id still render as two distinct posts
+//       (the renderer keys nothing on id, so there is no collision/crash).
+//   (c) a post container with NO `.post-content` parses without throwing and yields
+//       an empty body.
+// ---------------------------------------------------------------------------
+test('deriveId: a bare id="reply-" with no numeric suffix yields a positional id', () => {
+  // No permalink either, so the id must come from the positional fallback.
+  const html = `
+    <div class="post-list">
+      <div class="post-container post-reply">
+        <a class="noheight" id="reply-"></a>
+        <div class="post-character">Ann</div>
+        <div class="post-author">Auth</div>
+        <div class="post-content"><p>body</p></div>
+      </div>
+    </div>`;
+  const posts = parsePosts(domFor(html).window.document);
+  assert.equal(posts.length, 1);
+  assert.equal(posts[0].id, 'pos-0', 'empty reply- suffix falls through to the positional id');
+  assert.notEqual(posts[0].id, '', 'id is never the empty string');
+});
+
+test('duplicate numeric reply ids still render as two distinct posts', () => {
+  const html = `
+    <div class="post-list">
+      <div class="post-container post-reply">
+        <a class="noheight" id="reply-5"></a>
+        <div class="post-character">Ann</div>
+        <div class="post-author">A</div>
+        <div class="post-content"><p>first</p></div>
+      </div>
+      <div class="post-container post-reply">
+        <a class="noheight" id="reply-5"></a>
+        <div class="post-character">Bob</div>
+        <div class="post-author">B</div>
+        <div class="post-content"><p>second</p></div>
+      </div>
+    </div>`;
+  const doc = domFor(html).window.document;
+  const posts = parsePosts(doc);
+  assert.equal(posts.length, 2);
+  assert.deepEqual(posts.map((p) => p.id), ['5', '5'], 'both posts share the colliding id');
+
+  let reader!: HTMLElement;
+  assert.doesNotThrow(() => {
+    reader = renderReader(posts, { document: doc });
+  }, 'renderReader must not throw on an id collision');
+  const rendered = reader.querySelectorAll('.glr-post');
+  assert.equal(rendered.length, 2, 'two distinct posts rendered despite the id collision');
+  assert.notEqual(rendered[0], rendered[1], 'the two posts are distinct DOM nodes');
+  assert.match(rendered[0].textContent ?? '', /first/);
+  assert.match(rendered[1].textContent ?? '', /second/);
+});
+
+test('a post container with no .post-content parses and renders an empty body', () => {
+  const html = `
+    <div class="post-list">
+      <div class="post-container post-reply">
+        <a class="noheight" id="reply-9"></a>
+        <div class="post-character">Ann</div>
+        <div class="post-author">A</div>
+      </div>
+    </div>`;
+  const doc = domFor(html).window.document;
+
+  let posts: readonly Post[] = [];
+  assert.doesNotThrow(() => {
+    posts = parsePosts(doc);
+  }, 'parsePosts must not throw when .post-content is absent');
+  assert.equal(posts.length, 1);
+  assert.equal(posts[0].bodyHtml, '', 'missing .post-content yields an empty bodyHtml');
+
+  let reader!: HTMLElement;
+  assert.doesNotThrow(() => {
+    reader = renderReader(posts, { document: doc });
+  }, 'renderReader must not throw on an empty body');
+  const content = reader.querySelector('.glr-content');
+  assert.ok(content, 'a content node is still rendered');
+  assert.equal((content.textContent ?? '').trim(), '', 'the rendered body is empty');
+});
