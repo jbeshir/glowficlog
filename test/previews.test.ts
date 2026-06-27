@@ -1,4 +1,4 @@
-// Tests for enableIconPreviews (Fix 5): a single floating preview appended to
+// Tests for enableIconPreviews: a single floating preview appended to
 // <body> (so nothing clips it), shown on hover with a small delay, hidden on
 // leave, skipped for monogram fallbacks, and fully removed on cleanup.
 import { test } from 'node:test';

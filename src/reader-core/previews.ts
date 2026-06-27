@@ -1,4 +1,4 @@
-// Icon hover preview (Fix 5). A clean, flicker-free, never-clipped enlarged
+// Icon hover preview. A clean, flicker-free, never-clipped enlarged
 // preview of an icon shown next to it on hover.
 //
 // Design: ONE floating element (`.glr-icon-preview`) is created lazily and

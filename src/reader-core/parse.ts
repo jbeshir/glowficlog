@@ -1,5 +1,5 @@
 // parsePosts: turn a DOM subtree containing `.post-container` elements into an
-// immutable Post[]. Works for BOTH glowfic DOM shapes (see /in/glowfic-dom.md):
+// immutable Post[]. Works for BOTH glowfic DOM shapes:
 //   - flat view  (?view=flat): character/author are plain text, icon img has no <a>
 //   - paginated view: character/author/icon wrapped in <a>
 // Every field is null-guarded; malformed or absent markup yields nulls, never throws.

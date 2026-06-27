@@ -1,6 +1,9 @@
 /*
- * glowficlog reader styles. EVERY selector is prefixed `glr-` so nothing leaks
- * into the host page and the host page cannot accidentally style the reader.
+ * glowficlog reader styles. EVERY selector is prefixed `glr-` to keep the
+ * reader's rules namespaced and minimise collisions with the host page. This is
+ * a best-effort convention, NOT true isolation: the reader shares glowfic's CSS
+ * cascade (there is no Shadow DOM), so host styles can still reach reader nodes
+ * and vice-versa. The prefix just makes accidental overlap unlikely in practice.
  * Tunables are CSS custom properties on `.glr-reader`.
  *
  * Colours come from the HOST page at runtime: the content script samples the
@@ -24,7 +27,7 @@
   --glr-radius: 12px;          /* rounding of the icon box and the body rectangle */
 
   /* body typography — host-sampled by applyTheme; these are the fallbacks for
-     the harness / when the host could not be sampled (Fix 2). */
+     the harness / when the host could not be sampled. */
   --glr-font-family: Helvetica, Verdana, sans-serif;
   --glr-font-size: 16px;
   --glr-line-height: 1.25;
@@ -57,7 +60,7 @@
   padding: 12px 0 48px;
   background: var(--glr-bg);
   color: var(--glr-fg);
-  /* Match the host post typography (Fix 2). */
+  /* Match the host post typography. */
   font-family: var(--glr-font-family);
   font-size: var(--glr-font-size);
   line-height: var(--glr-line-height);
@@ -179,7 +182,7 @@
  * icon box's inner edge (the box sits `--glr-icon-pad` inside the gutter's inner
  * edge, so that edge is at `gutter − icon-pad`) with NO gap, and its BAND-SIDE
  * edge overlaps the band by 2px so the (opaque, same-tint) pieces fuse with no
- * seam (Fix 5). It spans, therefore, the icon padding + the full gap + a 2px band
+ * seam. It spans, therefore, the icon padding + the full gap + a 2px band
  * overlap. It sits at the post's first-line height — within the icon box's
  * vertical extent — so it reads as emanating from the icon box, identically on
  * left/right posts and on the first post / OP (whose accent rail is a band
@@ -270,7 +273,7 @@
 }
 
 /*
- * Full-size hover/focus preview (Fix 5). A SINGLE floating element is created by
+ * Full-size hover/focus preview. A SINGLE floating element is created by
  * enableIconPreviews() and appended to <body> — NOT nested in the reader — so no
  * ancestor `overflow` can clip it and showing it causes no layout shift. It is
  * `position: fixed` with a very high z-index, positioned next to the hovered icon
@@ -358,7 +361,7 @@
   opacity: 0.7;
 }
 
-/* Condensed repeat identity (Fix 3): the character name on a repeat post. Plain,
+/* Condensed repeat identity: the character name on a repeat post. Plain,
    readable text — deliberately NOT a pill and NOT a link: no background, no
    border-radius, no link colour, so it never reads as clickable. Bold foreground
    in the body font, marginally smaller than the first-appearance .glr-char, so it
@@ -389,7 +392,7 @@
   color: var(--glr-link);
 }
 
-/* Body typography (Fix 2 + Fix 3): full foreground colour and the host-sampled
+/* Body typography: full foreground colour and the host-sampled
    font/size/leading. There is NO inner measure cap — the text fills the post
    card's content box edge-to-edge (inset only by the card's --glr-post-pad), so
    the text width matches the post borders with no left-aligned dead space. */

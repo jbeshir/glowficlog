@@ -2,7 +2,7 @@
 // implementing the glowficlog reader layout. No global state, no mutation of the
 // input. The same posts + options always produce the same structure.
 //
-// Layout (see project brief / spec v4): one continuous centred column of post
+// Layout: one continuous centred column of post
 // bodies. Each post owns a subtle STRIPE tint (A/B by index parity) painted as
 // three connected pieces that read as one region:
 //   - a COMPACT icon BOX (the `.glr-arm`): the icon image plus a small symmetric
@@ -158,7 +158,7 @@ function buildArm(
     img.loading = 'lazy';
     img.decoding = 'async';
     // The full-size hover preview is a single floating element managed by
-    // enableIconPreviews() (Fix 5) — not a per-post node — so it doesn't bloat
+    // enableIconPreviews() — not a per-post node — so it doesn't bloat
     // the markup or get clipped by an ancestor's overflow.
     // Broken/blocked icons (and offline screenshots) degrade to the monogram.
     // Set as a property (not an attribute) so it never appears in serialized

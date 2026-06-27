@@ -101,7 +101,9 @@ public/options.html      Options page (links options.css + options.js).
 scripts/build.mjs        esbuild bundling + asset copy; embeds fixtures.
 scripts/package.mjs      web-ext (Firefox) + Chrome zip.
 icons/icon.svg           Source for the toolbar/store icons (rendered to icon-16/48/128.png).
-test/reader-core.test.ts node:test + jsdom unit tests (the in-pipeline render proxy).
+test/*.test.ts           node:test + jsdom unit suites (10 files, 157 tests) — reader-core
+                         render proxy plus DOM mount, theme, layout, body-trim, controls,
+                         options, icon previews, and moiety coverage.
 fixtures/                8 real captured thread fixtures + manifest.json.
 ```
 
@@ -218,7 +220,7 @@ required; `permissions` stays `["storage"]`; no new network calls are made.
 
 This extension **scrapes the glowfic DOM**, so it is inherently coupled to that
 markup and **may break if glowfic changes its HTML**. Documented assumptions
-(see `/in/glowfic-dom.md`, captured 2026-06-21):
+(observed from the live glowfic.com markup):
 
 - Posts are `.post-container`; the OP also has `.post-post`, replies `.post-reply`.
 - `.post-icon img` is the avatar; the whole `.post-icon` is **absent** when a post

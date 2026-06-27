@@ -90,7 +90,7 @@ test('readThemeFromDocument never throws on a bare document', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Fix 2 — host body typography sampling
+// Host body typography sampling
 // ---------------------------------------------------------------------------
 
 test('readThemeFromDocument samples font-family/size/line-height from .post-content', () => {
