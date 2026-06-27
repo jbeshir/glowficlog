@@ -19,6 +19,7 @@
 
 import type { Post, RenderOptions } from './types.js';
 import { trimBlankEdges } from './bodytrim.js';
+import { sanitizeBodyHtml, safePermalinkHref } from './sanitize.js';
 
 const NS = 'glr';
 
@@ -91,14 +92,21 @@ function initialFor(post: Post): string {
 
 /**
  * Build the post body node from raw HTML using the injected document. The markup
- * is the glowfic.com page's own already-rendered, same-origin content (or a saved
- * fixture in the dev harness), so the reader re-displays it as-is: re-inserting it
- * runs nothing the page did not already run, and `innerHTML` never executes
- * `<script>`. The only transform is the optional blank-edge trim.
+ * is the glowfic.com page's own rendered content (or a saved fixture in the dev
+ * harness) and is treated as UNTRUSTED: before it reaches the `innerHTML` sink it
+ * passes through DOMPurify (see sanitize.ts), which strips `<script>`, every `on*`
+ * event-handler attribute, and `javascript:`/`data:` URLs while preserving the
+ * legitimate post formatting glowfic uses (links, images, inline styles,
+ * blockquotes, lists, `<details>` spoilers, tables, `<br>`, bold/italic, …). The
+ * enforced invariant is therefore "no scriptable markup reaches the DOM"; we do
+ * not assume the source is inherently safe. DOMPurify is created against the
+ * injected document's own window so the same code path holds across the content
+ * script, jsdom, and the harness. After sanitization the only further transform is
+ * the optional blank-edge trim.
  */
 function buildBody(doc: Document, bodyHtml: string, trim: boolean): HTMLElement {
   const body = el(doc, 'div', `${NS}-content`);
-  body.innerHTML = bodyHtml;
+  body.innerHTML = sanitizeBodyHtml(doc, bodyHtml);
   // Optionally drop whitespace-only lines from the top/bottom of the post.
   if (trim) trimBlankEdges(body);
   return body;
@@ -196,7 +204,10 @@ function buildIdentity(doc: Document, post: Post, isFirst: boolean): HTMLElement
 
   if (post.permalink) {
     const link = el(doc, 'a', `${NS}-permalink`, '#') as HTMLAnchorElement;
-    link.href = post.permalink;
+    // Validate the scheme before assigning: only a relative path or http(s) URL
+    // is allowed through; anything else (e.g. a `javascript:` permalink) falls
+    // back to '#', closing the click-to-execute vector on this anchor.
+    link.href = safePermalinkHref(post.permalink);
     link.title = 'Permalink to this post';
     link.target = '_blank';
     link.rel = 'noopener noreferrer';

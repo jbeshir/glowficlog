@@ -253,7 +253,8 @@ test('absence variants: every edge case parses without throwing', () => {
           <div class="post-content"><p>gone</p></div>
         </div>
       </div>
-      <!-- malicious body content must be neutralised on render -->
+      <!-- hostile body content IS neutralised on render (DOMPurify), while the
+           legitimate formatting alongside it (a relative link, an <em>) survives -->
       <div class="post-container post-reply">
         <a class="noheight" id="reply-205"> </a>
         <div class="padding-10"><div class="post-info-box">
@@ -262,7 +263,7 @@ test('absence variants: every edge case parses without throwing', () => {
             <div class="post-character">Captain</div>
             <div class="post-author">Alice</div>
           </div></div>
-          <div class="post-content"><p onclick="evil()">x</p><script>evil()</script><a href="javascript:evil()">bad</a></div>
+          <div class="post-content"><p onclick="evil()">x</p><script>evil()</script><a href="javascript:evil()">bad</a><em>keepme</em><a href="/safe/path">oklink</a><img src="data:image/png;base64,AAAA" alt="d"></div>
         </div>
       </div>
     </div>`;
@@ -301,14 +302,42 @@ test('absence variants: every edge case parses without throwing', () => {
   assert.equal(deleted.screenname, null);
   assert.equal(deleted.iconUrl, null);
 
-  // Render must not throw on any of these edge cases (including a post body
-  // carrying a <script>, an inline handler, and a javascript: href — the reader
-  // re-displays glowfic's own same-origin markup as-is and does not sanitise it).
+  // Render must not throw on any of these edge cases, AND it must neutralise the
+  // hostile body content: the reader runs every post body through DOMPurify before
+  // it reaches innerHTML, so <script>, inline on* handlers, and javascript:/data:
+  // URLs are stripped, while legitimate formatting (a relative link, an <em>) is
+  // preserved.
   let reader!: HTMLElement;
   assert.doesNotThrow(() => {
     reader = renderReader(posts, { document: doc });
   });
   assert.equal(reader.querySelectorAll('.glr-post').length, 6);
+
+  // --- Sanitization is enforced (the hostile post is reply-205) ---
+  const hostile = reader.querySelector('[data-post-id="205"] .glr-content');
+  assert.ok(hostile, 'hostile post body rendered');
+  // <script> is stripped (nowhere in the rendered tree, and not in the body).
+  assert.equal(reader.querySelector('script'), null, '<script> stripped');
+  assert.equal(hostile.querySelector('script'), null, 'no <script> in body');
+  // Inline on* event-handler attributes are stripped.
+  assert.equal(reader.querySelector('[onclick]'), null, 'on* handlers stripped');
+  // No javascript: href survives anywhere.
+  assert.equal(
+    reader.querySelector('a[href^="javascript:" i]'),
+    null,
+    'javascript: href neutralised',
+  );
+  // No data: URL survives (e.g. on the img src).
+  assert.equal(
+    hostile.querySelector('[src^="data:" i]'),
+    null,
+    'data: URL neutralised',
+  );
+  // Legitimate formatting in the SAME body survives sanitization:
+  const em = hostile.querySelector('em');
+  assert.ok(em && /keepme/.test(em.textContent ?? ''), '<em> preserved');
+  const safeLink = hostile.querySelector('a[href="/safe/path"]');
+  assert.ok(safeLink, 'relative link preserved with its href intact');
 
   // Reader default theme is light.
   assert.equal(reader.getAttribute('data-theme'), 'light');

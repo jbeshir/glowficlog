@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- **Sanitise post body HTML at the parse→render boundary (DOMPurify)**: post
+  bodies are untrusted page/fixture markup, so `buildBody` now runs every body
+  through DOMPurify (`src/reader-core/sanitize.ts`) before assigning it to
+  `innerHTML`. This strips `<script>`, every `on*` event-handler attribute, and
+  `javascript:`/`data:` URLs, while preserving the legitimate formatting glowfic
+  posts use (links, images, inline styles, blockquotes, lists, `<details>`,
+  tables, `<br>`, bold/italic, …). DOMPurify is created against the *injected
+  document's* own window (`doc.defaultView`), so the same code path holds in the
+  content script, the jsdom test suite, and the offline harness. This supersedes
+  the v0.1.6-alpha decision below to add no sanitisation layer: the body is in
+  fact an untrusted trust boundary, and it is now enforced.
+- **Validate the permalink scheme before assigning `href`**: the reader-core
+  permalink anchor now accepts only a relative path or an `http(s)://` URL,
+  falling back to `#` otherwise, closing a `javascript:`-href click-to-execute
+  vector. Adds `dompurify` (3.x) as a runtime dependency.
+
 ## v0.1.6-alpha — 2026-06-26
 
 ### Reader

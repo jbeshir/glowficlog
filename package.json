@@ -5,6 +5,9 @@
   "description": "Browser extension that reformats glowfic.com threads into a compact, high-information-density reader view, plus an offline dev harness sharing the same renderer.",
   "private": true,
   "type": "module",
+  "dependencies": {
+    "dompurify": "^3.2.0"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",

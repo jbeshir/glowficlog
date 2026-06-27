@@ -235,12 +235,17 @@ These class names are hand-authored and stable in the glowfic source, but no
 scraper is future-proof. If the reader ever shows nothing, glowfic's markup has
 likely changed and the selectors in `src/reader-core/parse.ts` need updating.
 
-Post body HTML is reinserted from the host page (or fixture). This is
-glowfic.com's own already-rendered, same-origin markup, so the reader re-displays
-it as-is — re-inserting it runs nothing the page did not already run, and
-`innerHTML` never executes `<script>`. glowfic is the trust boundary; the reader
-adds no sanitisation layer (one would enforce no real boundary while implying
-one).
+Post body HTML is reinserted from the host page (or fixture), so it is treated as
+untrusted at the parse→render boundary. Before any body reaches an `innerHTML`
+sink, `src/reader-core/sanitize.ts` runs it through DOMPurify (created against the
+injected document's own window, so the same path holds in the content script,
+jsdom, and the offline harness). Sanitization strips `<script>`, every `on*`
+event-handler attribute, and `javascript:`/`data:` URLs, while preserving the
+legitimate formatting glowfic posts use — links, images, inline styles,
+blockquotes, lists, `<details>` spoilers, tables, `<br>`, bold/italic, etc. The
+permalink anchor's `href` is independently validated (relative path or `http(s)`
+only, else `#`). The enforced invariant is that no scriptable markup reaches the
+DOM.
 
 ## License
 
