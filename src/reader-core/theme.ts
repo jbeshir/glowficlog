@@ -217,37 +217,17 @@ export function applyTheme(rootEl: HTMLElement, vars: ThemeVars): void {
 }
 
 /**
- * Subscribe to live OS colour-scheme changes. Calls `onChange('dark' | 'light')`
- * whenever `prefers-color-scheme` flips at runtime, so a caller that follows the OS
- * theme can re-theme without a reload. Returns an unsubscribe function; it is a
- * no-op when `matchMedia` is unavailable (e.g. under jsdom), so callers never need
- * to feature-detect. The listener is fully removable, so it leaks nothing when the
- * caller tears down.
- *
- * Uses the modern `addEventListener('change', …)` where present and falls back to
- * the deprecated `addListener` for older WebKit/Safari, mirroring the cross-browser
- * stance of the rest of the extension.
+ * Derive the reader's light/dark mode from a sampled {@link ThemeVars} — i.e. from
+ * the glowfic page's OWN theme, never the OS. The reader mirrors whatever glowfic
+ * is showing, so the only correct signal is the sampled host background: a dark
+ * page yields `'dark'`, a light page `'light'`. Falls back to `'light'` when the
+ * background could not be sampled or parsed, matching reader.css's light defaults.
  */
-export function watchSystemTheme(onChange: (theme: 'light' | 'dark') => void): () => void {
-  let queried: MediaQueryList | undefined;
-  try {
-    queried = globalThis.matchMedia?.('(prefers-color-scheme: dark)');
-  } catch {
-    /* matchMedia may throw or be absent — treat as "no live updates available". */
-  }
-  if (!queried) return () => {};
-  // Bind to a const so the non-undefined narrowing holds inside the closures below.
-  const mql = queried;
-
-  const handler = (event: MediaQueryListEvent): void => {
-    onChange(event.matches ? 'dark' : 'light');
-  };
-
-  if (typeof mql.addEventListener === 'function') {
-    mql.addEventListener('change', handler);
-    return () => mql.removeEventListener('change', handler);
-  }
-  // Legacy API (deprecated, but the only option on older WebKit).
-  mql.addListener(handler);
-  return () => mql.removeListener(handler);
+export function themeMode(vars: ThemeVars): 'light' | 'dark' {
+  const rgba = parseColor(vars.bg);
+  if (!rgba) return 'light';
+  const [r, g, b] = rgba;
+  // sRGB perceived luminance on a 0–255 scale; below the midpoint is a dark surface.
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luminance < 128 ? 'dark' : 'light';
 }

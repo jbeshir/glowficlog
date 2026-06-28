@@ -10,7 +10,7 @@ export {
   applyTheme,
   withAlpha,
   isTransparent,
-  watchSystemTheme,
+  themeMode,
 } from './theme.js';
 export {
   computeIconSizes,

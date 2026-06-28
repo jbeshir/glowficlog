@@ -11,13 +11,13 @@ import {
   renderReader,
   readThemeFromDocument,
   applyTheme,
+  themeMode,
   layoutIcons,
   markSingleLineBodies,
   mountReaderInPostList,
   unmountReader,
   enableIconPreviews,
   applyMoieties,
-  watchSystemTheme,
 } from '../reader-core/index.js';
 import { applyMoietyRings } from './moiety.js';
 import { createControls, type Controls } from './controls.js';
@@ -39,17 +39,6 @@ let controls: Controls | null = null;
 /** Last-known options; refreshed at init and on storage changes. */
 let options: Options = DEFAULT_OPTIONS;
 
-function detectTheme(): 'light' | 'dark' {
-  try {
-    if (globalThis.matchMedia?.('(prefers-color-scheme: dark)').matches) {
-      return 'dark';
-    }
-  } catch {
-    /* matchMedia may be unavailable */
-  }
-  return 'light';
-}
-
 /** True for ANY glowfic thread page — including paginated reply pages
  *  (`/posts/{id}?page=2+`) that contain only `.post-reply` containers and no OP.
  *  Detection keys off the presence of a `.post-container`, never the OP. */
@@ -62,17 +51,23 @@ function activate(): void {
   const posts = parsePosts(document);
   if (posts.length === 0) return; // selectors absent → no-op
 
+  // Colours, typography AND light/dark all follow the host glowfic theme — read
+  // BEFORE we hide the originals, while their computed styles are still observable.
+  // Cheap, so re-read on every (re)activation rather than caching.
+  const hostTheme = readThemeFromDocument(document);
+  const mode = themeMode(hostTheme);
   const reader = renderReader(posts, {
     document,
-    theme: detectTheme(),
+    theme: mode,
     trimBlankEdges: options.trimBlankEdges,
   });
   // The super-condensed density mode is a single class on the reader root.
   reader.classList.toggle('glr-condensed', options.condensed);
-  // Colours AND typography follow the host glowfic theme (read BEFORE we hide the
-  // originals, while their computed styles are still observable). Cheap, so
-  // re-read on every (re)activation rather than caching.
-  applyTheme(reader, readThemeFromDocument(document));
+  applyTheme(reader, hostTheme);
+  // The floating controls live on <body>, outside the reader, so they can't inherit
+  // its tokens; point them at the same host-derived mode so the buttons match
+  // glowfic's light/dark rather than the OS.
+  controls?.container.setAttribute('data-theme', mode);
   // Insert the reader at the post list's position — between the top and bottom
   // paginators — and hide only the post containers (paginators stay). Bail out
   // untouched if there are no containers to anchor to.
@@ -148,6 +143,9 @@ function mountControls(): void {
     onOpenOptions: () => openOptionsPage(),
   });
   document.body.appendChild(controls.container);
+  // Theme the cluster from glowfic's own palette so the toggle matches the host
+  // even while the reader is OFF (re-set from the live sample on each activate).
+  controls.container.setAttribute('data-theme', themeMode(readThemeFromDocument(document)));
   reflectButton();
 }
 
@@ -200,16 +198,10 @@ async function init(): Promise<void> {
   // does full page loads (no SPA navigation), so when the page is left the browser
   // tears down this context — and with it every listener and chrome.* registration
   // here. There is nothing to unsubscribe; we let them die with the page, so the
-  // unsubscribe handles onOptionsChanged/watchSystemTheme return are discarded.
+  // unsubscribe handle onOptionsChanged returns is discarded.
   document.addEventListener('keydown', onKeydown, true);
   globalThis.addEventListener?.('resize', onResize);
   onOptionsChanged(onStorageChange);
-  // Live OS dark/light flips: there is no explicit light/dark option, so the reader
-  // always follows the OS — every flip rebuilds, which re-derives data-theme (via
-  // detectTheme → renderReader) and re-samples the host colours.
-  watchSystemTheme(() => {
-    if (readerEl) rebuild();
-  });
 
   // Restore remembered state (everything OFF by default). Load BEFORE mounting the
   // controls so the toggle button paints in its correct on/off state on first frame

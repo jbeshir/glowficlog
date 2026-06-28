@@ -438,9 +438,10 @@
 /* Floating control cluster (spanner + toggle) injected by the content script. The
    cluster is appended to document.body — OUTSIDE .glr-reader — so it cannot inherit
    the reader's host-sampled palette tokens. It instead carries its OWN control-chrome
-   tokens here (light defaults + the prefers-color-scheme override below), so the two
-   buttons reference --glr-btn-* design tokens rather than hardcoded colour literals
-   and theme correctly when the OS is in dark mode. */
+   tokens here (light defaults + the [data-theme="dark"] override below), so the two
+   buttons reference --glr-btn-* design tokens rather than hardcoded colour literals.
+   The content script sets data-theme on the cluster from glowfic's sampled palette,
+   so the buttons follow the host's light/dark — not the OS. */
 .glr-controls {
   --glr-btn-bg: #2563eb;          /* accent blue (matches the reader's --glr-link light) */
   --glr-btn-bg-hover: #1d4ed8;    /* darker accent on hover */
@@ -458,17 +459,15 @@
   gap: 8px;
 }
 
-/* Dark-mode control chrome: the floating cluster follows the OS colour scheme
-   (the same signal the content script's detectTheme() reads), keeping the buttons
-   legible on dark hosts. */
-@media (prefers-color-scheme: dark) {
-  .glr-controls {
-    --glr-btn-bg: #3b5bdb;
-    --glr-btn-bg-hover: #2f49ad;
-    --glr-btn-on: #0a8f6a;
-    --glr-btn-fg: #f5f6f8;
-    --glr-btn-focus: #c7d2fe;
-  }
+/* Dark-mode control chrome: the content script sets data-theme="dark" on the
+   cluster when glowfic's sampled background is dark, keeping the buttons legible
+   on dark hosts — matching the host theme rather than the OS. */
+.glr-controls[data-theme="dark"] {
+  --glr-btn-bg: #3b5bdb;
+  --glr-btn-bg-hover: #2f49ad;
+  --glr-btn-on: #0a8f6a;
+  --glr-btn-fg: #f5f6f8;
+  --glr-btn-focus: #c7d2fe;
 }
 
 .glr-toggle {
