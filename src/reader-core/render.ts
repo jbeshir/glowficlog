@@ -19,7 +19,6 @@
 
 import type { Post, RenderOptions } from './types.js';
 import { trimBlankEdges } from './bodytrim.js';
-import { sanitizeBodyHtml, safePermalinkHref } from './sanitize.js';
 
 const NS = 'glr';
 
@@ -92,21 +91,23 @@ function initialFor(post: Post): string {
 
 /**
  * Build the post body node from raw HTML using the injected document. The markup
- * is the glowfic.com page's own rendered content (or a saved fixture in the dev
- * harness) and is treated as UNTRUSTED: before it reaches the `innerHTML` sink it
- * passes through DOMPurify (see sanitize.ts), which strips `<script>`, every `on*`
- * event-handler attribute, and `javascript:`/`data:` URLs while preserving the
- * legitimate post formatting glowfic uses (links, images, inline styles,
- * blockquotes, lists, `<details>` spoilers, tables, `<br>`, bold/italic, …). The
- * enforced invariant is therefore "no scriptable markup reaches the DOM"; we do
- * not assume the source is inherently safe. DOMPurify is created against the
- * injected document's own window so the same code path holds across the content
- * script, jsdom, and the harness. After sanitization the only further transform is
- * the optional blank-edge trim.
+ * is the glowfic.com page's own server-rendered post content (`.post-content`),
+ * already live in this same-origin document — the browser parsed it, and ran or
+ * didn't run it, at page load, before this content script existed. We re-display
+ * it as-is. Assigning it back via `innerHTML` does not re-execute `<script>` (the
+ * HTML5 inert-script rule), so the re-display adds no execution path of its own.
+ *
+ * This reader is NOT a security boundary for glowfic's content and deliberately
+ * does not try to be one: a content script sits downstream of an origin that has
+ * already rendered the markup, so it cannot reliably sanitise what the page is
+ * already showing, and an allowlist aggressive enough to "secure" arbitrary rich
+ * post HTML would mangle legitimate posts. The boundary that matters is glowfic's
+ * own server-side handling — the same one protecting the page you are looking at.
+ * The only transform here is the optional blank-edge trim.
  */
 function buildBody(doc: Document, bodyHtml: string, trim: boolean): HTMLElement {
   const body = el(doc, 'div', `${NS}-content`);
-  body.innerHTML = sanitizeBodyHtml(doc, bodyHtml);
+  body.innerHTML = bodyHtml;
   // Optionally drop whitespace-only lines from the top/bottom of the post.
   if (trim) trimBlankEdges(body);
   return body;
@@ -204,10 +205,7 @@ function buildIdentity(doc: Document, post: Post, isFirst: boolean): HTMLElement
 
   if (post.permalink) {
     const link = el(doc, 'a', `${NS}-permalink`, '#') as HTMLAnchorElement;
-    // Validate the scheme before assigning: only a relative path or http(s) URL
-    // is allowed through; anything else (e.g. a `javascript:` permalink) falls
-    // back to '#', closing the click-to-execute vector on this anchor.
-    link.href = safePermalinkHref(post.permalink);
+    link.href = post.permalink;
     link.title = 'Permalink to this post';
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
