@@ -215,3 +215,19 @@ export function applyTheme(rootEl: HTMLElement, vars: ThemeVars): void {
     set('--glr-chip-bg', withAlpha(vars.link, 0.16));
   }
 }
+
+/**
+ * Derive the reader's light/dark mode from a sampled {@link ThemeVars} — i.e. from
+ * the glowfic page's OWN theme, never the OS. The reader mirrors whatever glowfic
+ * is showing, so the only correct signal is the sampled host background: a dark
+ * page yields `'dark'`, a light page `'light'`. Falls back to `'light'` when the
+ * background could not be sampled or parsed, matching reader.css's light defaults.
+ */
+export function themeMode(vars: ThemeVars): 'light' | 'dark' {
+  const rgba = parseColor(vars.bg);
+  if (!rgba) return 'light';
+  const [r, g, b] = rgba;
+  // sRGB perceived luminance on a 0–255 scale; below the midpoint is a dark surface.
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luminance < 128 ? 'dark' : 'light';
+}

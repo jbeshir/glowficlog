@@ -1,6 +1,9 @@
 /*
- * glowficlog reader styles. EVERY selector is prefixed `glr-` so nothing leaks
- * into the host page and the host page cannot accidentally style the reader.
+ * glowficlog reader styles. EVERY selector is prefixed `glr-` to keep the
+ * reader's rules namespaced and minimise collisions with the host page. This is
+ * a best-effort convention, NOT true isolation: the reader shares glowfic's CSS
+ * cascade (there is no Shadow DOM), so host styles can still reach reader nodes
+ * and vice-versa. The prefix just makes accidental overlap unlikely in practice.
  * Tunables are CSS custom properties on `.glr-reader`.
  *
  * Colours come from the HOST page at runtime: the content script samples the
@@ -24,7 +27,7 @@
   --glr-radius: 12px;          /* rounding of the icon box and the body rectangle */
 
   /* body typography — host-sampled by applyTheme; these are the fallbacks for
-     the harness / when the host could not be sampled (Fix 2). */
+     the harness / when the host could not be sampled. */
   --glr-font-family: Helvetica, Verdana, sans-serif;
   --glr-font-size: 16px;
   --glr-line-height: 1.25;
@@ -57,7 +60,7 @@
   padding: 12px 0 48px;
   background: var(--glr-bg);
   color: var(--glr-fg);
-  /* Match the host post typography (Fix 2). */
+  /* Match the host post typography. */
   font-family: var(--glr-font-family);
   font-size: var(--glr-font-size);
   line-height: var(--glr-line-height);
@@ -179,7 +182,7 @@
  * icon box's inner edge (the box sits `--glr-icon-pad` inside the gutter's inner
  * edge, so that edge is at `gutter − icon-pad`) with NO gap, and its BAND-SIDE
  * edge overlaps the band by 2px so the (opaque, same-tint) pieces fuse with no
- * seam (Fix 5). It spans, therefore, the icon padding + the full gap + a 2px band
+ * seam. It spans, therefore, the icon padding + the full gap + a 2px band
  * overlap. It sits at the post's first-line height — within the icon box's
  * vertical extent — so it reads as emanating from the icon box, identically on
  * left/right posts and on the first post / OP (whose accent rail is a band
@@ -270,7 +273,7 @@
 }
 
 /*
- * Full-size hover/focus preview (Fix 5). A SINGLE floating element is created by
+ * Full-size hover/focus preview. A SINGLE floating element is created by
  * enableIconPreviews() and appended to <body> — NOT nested in the reader — so no
  * ancestor `overflow` can clip it and showing it causes no layout shift. It is
  * `position: fixed` with a very high z-index, positioned next to the hovered icon
@@ -358,7 +361,7 @@
   opacity: 0.7;
 }
 
-/* Condensed repeat identity (Fix 3): the character name on a repeat post. Plain,
+/* Condensed repeat identity: the character name on a repeat post. Plain,
    readable text — deliberately NOT a pill and NOT a link: no background, no
    border-radius, no link colour, so it never reads as clickable. Bold foreground
    in the body font, marginally smaller than the first-appearance .glr-char, so it
@@ -389,7 +392,7 @@
   color: var(--glr-link);
 }
 
-/* Body typography (Fix 2 + Fix 3): full foreground colour and the host-sampled
+/* Body typography: full foreground colour and the host-sampled
    font/size/leading. There is NO inner measure cap — the text fills the post
    card's content box edge-to-edge (inset only by the card's --glr-post-pad), so
    the text width matches the post borders with no left-aligned dead space. */
@@ -432,8 +435,20 @@
   display: none !important;
 }
 
-/* Floating control cluster (spanner + toggle) injected by the content script. */
+/* Floating control cluster (spanner + toggle) injected by the content script. The
+   cluster is appended to document.body — OUTSIDE .glr-reader — so it cannot inherit
+   the reader's host-sampled palette tokens. It instead carries its OWN control-chrome
+   tokens here (light defaults + the [data-theme="dark"] override below), so the two
+   buttons reference --glr-btn-* design tokens rather than hardcoded colour literals.
+   The content script sets data-theme on the cluster from glowfic's sampled palette,
+   so the buttons follow the host's light/dark — not the OS. */
 .glr-controls {
+  --glr-btn-bg: #2563eb;          /* accent blue (matches the reader's --glr-link light) */
+  --glr-btn-bg-hover: #1d4ed8;    /* darker accent on hover */
+  --glr-btn-on: #047857;          /* success green for the "on"/pressed toggle state */
+  --glr-btn-fg: #ffffff;          /* button label / icon colour */
+  --glr-btn-focus: #ffffff;       /* focus-ring colour */
+
   position: fixed;
   right: 16px;
   bottom: 16px;
@@ -442,6 +457,17 @@
   flex-direction: row;
   align-items: center;
   gap: 8px;
+}
+
+/* Dark-mode control chrome: the content script sets data-theme="dark" on the
+   cluster when glowfic's sampled background is dark, keeping the buttons legible
+   on dark hosts — matching the host theme rather than the OS. */
+.glr-controls[data-theme="dark"] {
+  --glr-btn-bg: #3b5bdb;
+  --glr-btn-bg-hover: #2f49ad;
+  --glr-btn-on: #0a8f6a;
+  --glr-btn-fg: #f5f6f8;
+  --glr-btn-focus: #c7d2fe;
 }
 
 .glr-toggle {
@@ -456,16 +482,16 @@
   padding: 8px 16px;
   border: none;
   border-radius: 999px;
-  background: #2563eb;
-  color: #ffffff;
+  background: var(--glr-btn-bg);
+  color: var(--glr-btn-fg);
   font: 600 13px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 
-.glr-toggle:hover { background: #1d4ed8; }
-.glr-toggle[aria-pressed="true"] { background: #047857; }
-.glr-toggle:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.glr-toggle:hover { background: var(--glr-btn-bg-hover); }
+.glr-toggle[aria-pressed="true"] { background: var(--glr-btn-on); }
+.glr-toggle:focus-visible { outline: 2px solid var(--glr-btn-focus); outline-offset: 2px; }
 
 .glr-spanner {
   display: inline-flex;
@@ -477,16 +503,16 @@
   padding: 0;
   border: none;
   border-radius: 999px;
-  background: #2563eb;
-  color: #fff;
+  background: var(--glr-btn-bg);
+  color: var(--glr-btn-fg);
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 
-.glr-spanner:hover { background: #1d4ed8; }
-.glr-spanner:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.glr-spanner:hover { background: var(--glr-btn-bg-hover); }
+.glr-spanner:focus-visible { outline: 2px solid var(--glr-btn-focus); outline-offset: 2px; }
 /* .glr-spanner sets display:inline-flex (specificity 0,1,0); the UA [hidden]
    rule is also 0,1,0 but UA loses to author, so the element would stay visible
    even when hidden=true. This 0,2,0 rule restores the intended hide behaviour. */

@@ -109,7 +109,7 @@ test('commonAncestor: elements in separate trees share no ancestor', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Fix 1 — mountReaderInPostList / unmountReader: the reader is inserted BETWEEN
+// mountReaderInPostList / unmountReader: the reader is inserted BETWEEN
 // the top and bottom paginators (immediately before the first .post-container),
 // only .post-containers are hidden, paginators stay, and toggle-off restores.
 // ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ test('mountReaderInPostList: no containers → null (page left untouched)', () =
 });
 
 // ---------------------------------------------------------------------------
-// Fix 1 (real fixtures) — the reader must land BETWEEN the top and bottom
+// Real fixtures — the reader must land BETWEEN the top and bottom
 // paginators on BOTH the page-1 DOM (visible OP ABOVE the top nav) and the
 // page-2 DOM (collapsed OP inside `.post-expander > .hidden` BEFORE the top
 // nav). These use the actual captured `#content` markup, not a hand-built

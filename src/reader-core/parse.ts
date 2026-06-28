@@ -1,5 +1,5 @@
 // parsePosts: turn a DOM subtree containing `.post-container` elements into an
-// immutable Post[]. Works for BOTH glowfic DOM shapes (see /in/glowfic-dom.md):
+// immutable Post[]. Works for BOTH glowfic DOM shapes:
 //   - flat view  (?view=flat): character/author are plain text, icon img has no <a>
 //   - paginated view: character/author/icon wrapped in <a>
 // Every field is null-guarded; malformed or absent markup yields nulls, never throws.
@@ -24,9 +24,11 @@ function fieldText(container: Element, selector: string): string | null {
 }
 
 function deriveId(container: Element, index: number, permalink: string | null): string {
-  // Replies carry `<a class="noheight" id="reply-{n}">`.
+  // Replies carry `<a class="noheight" id="reply-{n}">`. Require at least one digit
+  // after the prefix so a malformed bare `id="reply-"` (slice → "") falls through to
+  // the safe positional id below instead of yielding an empty string.
   const anchorId = container.querySelector('a.noheight')?.id;
-  if (anchorId && anchorId.startsWith('reply-')) {
+  if (anchorId && /^reply-\d/.test(anchorId)) {
     return anchorId.slice('reply-'.length);
   }
   // OP has no noheight anchor; its permalink is `/posts/{n}`.

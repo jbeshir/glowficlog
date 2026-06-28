@@ -101,7 +101,9 @@ public/options.html      Options page (links options.css + options.js).
 scripts/build.mjs        esbuild bundling + asset copy; embeds fixtures.
 scripts/package.mjs      web-ext (Firefox) + Chrome zip.
 icons/icon.svg           Source for the toolbar/store icons (rendered to icon-16/48/128.png).
-test/reader-core.test.ts node:test + jsdom unit tests (the in-pipeline render proxy).
+test/*.test.ts           node:test + jsdom unit suites (10 files, 157 tests) — reader-core
+                         render proxy plus DOM mount, theme, layout, body-trim, controls,
+                         options, icon previews, and moiety coverage.
 fixtures/                8 real captured thread fixtures + manifest.json.
 ```
 
@@ -218,7 +220,7 @@ required; `permissions` stays `["storage"]`; no new network calls are made.
 
 This extension **scrapes the glowfic DOM**, so it is inherently coupled to that
 markup and **may break if glowfic changes its HTML**. Documented assumptions
-(see `/in/glowfic-dom.md`, captured 2026-06-21):
+(observed from the live glowfic.com markup):
 
 - Posts are `.post-container`; the OP also has `.post-post`, replies `.post-reply`.
 - `.post-icon img` is the avatar; the whole `.post-icon` is **absent** when a post
@@ -235,12 +237,14 @@ These class names are hand-authored and stable in the glowfic source, but no
 scraper is future-proof. If the reader ever shows nothing, glowfic's markup has
 likely changed and the selectors in `src/reader-core/parse.ts` need updating.
 
-Post body HTML is reinserted from the host page (or fixture). This is
-glowfic.com's own already-rendered, same-origin markup, so the reader re-displays
-it as-is — re-inserting it runs nothing the page did not already run, and
-`innerHTML` never executes `<script>`. glowfic is the trust boundary; the reader
-adds no sanitisation layer (one would enforce no real boundary while implying
-one).
+Post body HTML is re-inserted from the host page (or a fixture) via `innerHTML`.
+This is glowfic.com's own server-rendered markup, already live in the same-origin
+page before the extension runs, and re-inserting it via `innerHTML` does not
+execute `<script>`. The reader is deliberately **not** a sanitiser for glowfic's
+content and cannot reliably be one: a content script sits downstream of the origin
+that already rendered the markup, and an allowlist strict enough to "secure"
+arbitrary rich post HTML would mangle legitimate posts. The trust boundary is
+glowfic's own server-side handling — the same one protecting the page itself.
 
 ## License
 
