@@ -50,6 +50,12 @@
      Low-alpha overlays so they read on light AND dark host themes. */
   --glr-stripe-a: rgba(27, 27, 31, 0.045);
   --glr-stripe-b: rgba(27, 27, 31, 0.09);
+  /* "Linked/unread here" accent (Req 1) — glowfic's red convention for a post
+     that links back to "here". A solid ring colour plus a matched low-alpha
+     wash for the band fill (no color-mix: this file composites tints as
+     opaque layers instead, see the stripe-tint comment above). */
+  --glr-linked: #ff0000;
+  --glr-linked-wash: rgba(255, 0, 0, 0.07);
 
   box-sizing: border-box;
   width: 100%;
@@ -75,6 +81,9 @@
   --glr-pop-shadow: rgba(0, 0, 0, 0.6);
   --glr-stripe-a: rgba(230, 231, 234, 0.05);
   --glr-stripe-b: rgba(230, 231, 234, 0.1);
+  /* Softened so pure red doesn't glare against a dark background. */
+  --glr-linked: #ff5a5a;
+  --glr-linked-wash: rgba(255, 90, 90, 0.14);
 }
 
 .glr-reader *,
@@ -171,6 +180,34 @@
 /* OP gets a subtle accent rail down the leading edge of its body rectangle. */
 .glr-post--op .glr-band {
   box-shadow: inset 3px 0 0 0 var(--glr-chip-bg);
+}
+
+/*
+ * Linked/unread-here treatment (Req 1): server-flagged posts (`.glr-post--linked`,
+ * from `post.highlighted`) get a ring + wash on the band AND an accent on the icon
+ * box, so the post reads as linked both at reading distance and from the gutter
+ * alone (e.g. once the band has scrolled out of a narrow viewport). The wash uses
+ * `inset 0 0 0 9999px` — a solid inset fill that still respects the band's
+ * border-radius — layered under a crisp 2px ring in the same hue.
+ */
+.glr-post--linked .glr-band {
+  box-shadow:
+    inset 0 0 0 2px var(--glr-linked),
+    inset 0 0 0 9999px var(--glr-linked-wash);
+}
+/* Linked OP: keep BOTH the OP leading rail and the linked ring/wash — a single
+   box-shadow declaration can't inherit from two class rules, so merge them here. */
+.glr-post--op.glr-post--linked .glr-band {
+  box-shadow:
+    inset 3px 0 0 0 var(--glr-chip-bg),
+    inset 0 0 0 2px var(--glr-linked),
+    inset 0 0 0 9999px var(--glr-linked-wash);
+}
+/* Outline (not box-shadow) so it never fights the icon box's moiety-ring
+   box-shadow — the two accents can coexist. */
+.glr-post--linked .glr-icon-box {
+  outline: 2px solid var(--glr-linked);
+  outline-offset: 2px;
 }
 
 /*
@@ -300,6 +337,95 @@
 .glr-icon-preview img {
   display: block;
   border-radius: 6px;
+}
+
+/*
+ * Portrait action menu (Req 3): a small popover of post actions (mark unread
+ * here, bookmark, etc — scraped from glowfic's `.post-edit-box`), appended
+ * inside `.glr-arm` right after `.glr-icon-box` and triggered from it (the
+ * `.glr-icon-box--menu` role="button"). It is `position: absolute` against the
+ * arm (its positioned ancestor on desktop — see the mobile override below,
+ * where the arm goes static), themed from the same vars as the rest of the
+ * reader, and sits just under the icon-preview/controls layer (2147483646).
+ * The content script toggles both the `hidden` attribute and a
+ * `glr-actions--open` class; either is enough to reveal the menu here.
+ */
+.glr-actions {
+  position: absolute;
+  top: 100%;
+  margin-top: 6px;
+  z-index: 2147483645;
+  min-width: 180px;
+  padding: 4px;
+  border-radius: var(--glr-radius);
+  border: 1px solid var(--glr-sep);
+  background: var(--glr-bg);
+  color: var(--glr-fg);
+  box-shadow: 0 8px 30px var(--glr-pop-shadow);
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+  pointer-events: none;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+/* Open toward the text column rather than off the viewport edge. */
+.glr-arm--left .glr-actions { left: 0; }
+.glr-arm--right .glr-actions { right: 0; }
+
+.glr-actions[hidden] { display: none; }
+.glr-actions:not([hidden]),
+.glr-actions.glr-actions--open {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+/* Each action is a link (role="menuitem"); 44px min target for touch, themed
+   hover/focus fill from the existing chip accent. */
+.glr-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  color: var(--glr-fg);
+  font-size: 0.92em;
+  text-decoration: none;
+  cursor: pointer;
+}
+.glr-action:hover,
+.glr-action:focus-visible {
+  background: var(--glr-chip-bg);
+}
+.glr-action:focus-visible {
+  outline: 2px solid var(--glr-link);
+  outline-offset: -2px;
+}
+
+.glr-action-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.glr-action-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Subtle affordance that the portrait is now a menu trigger — deliberately
+   quiet so it doesn't disturb layoutIcons' sizing of the icon itself. */
+.glr-icon-box--menu {
+  cursor: pointer;
+}
+.glr-icon-box--menu:focus-visible {
+  outline: 2px solid var(--glr-link);
+  outline-offset: 2px;
 }
 
 /* Text body. Positioned so it paints ABOVE its post's translucent band; the
@@ -593,6 +719,34 @@
   /* Restore the OP's leading accent rail (the desktop rule put it on the band). */
   .glr-post--op {
     box-shadow: inset 3px 0 0 0 var(--glr-chip-bg);
+  }
+
+  /* Linked/unread-here treatment (Req 1), mobile: .glr-band is display:none here,
+     so the ring + wash move onto the post box itself as a leading rail + fill —
+     same var-driven colours as desktop, just re-homed onto a visible element. */
+  .glr-post--linked {
+    box-shadow:
+      inset 4px 0 0 0 var(--glr-linked),
+      inset 0 0 0 9999px var(--glr-linked-wash);
+  }
+  .glr-post--op.glr-post--linked {
+    box-shadow:
+      inset 3px 0 0 0 var(--glr-chip-bg),
+      inset 4px 0 0 0 var(--glr-linked),
+      inset 0 0 0 9999px var(--glr-linked-wash);
+  }
+
+  /* Actions popover (Req 3), mobile: .glr-arm is float:right/position:static
+     here, so it no longer anchors the popover — .glr-post (still position:relative)
+     becomes the effective positioned ancestor. Re-anchor to the post's top-right
+     corner, offset below the (now-floated) icon box's own rendered height. Equal
+     specificity to the desktop `.glr-arm--left/--right .glr-actions` rules, and
+     this block comes later in the file, so it wins regardless of post side. */
+  .glr-arm--left .glr-actions,
+  .glr-arm--right .glr-actions {
+    top: calc(var(--glr-icon-min) + (var(--glr-icon-pad) * 2) + 8px);
+    left: auto;
+    right: 0;
   }
 
   /* Keep the control cluster reachable on narrow screens; two 44px buttons +
