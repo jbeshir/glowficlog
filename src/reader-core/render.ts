@@ -164,6 +164,53 @@ function buildArm(
   }
 
   arm.appendChild(box);
+
+  // Portrait action menu: only when the post scraped edit-box actions
+  // (mark unread here, bookmark, etc — `.post-edit-box` links). The trigger
+  // attributes on the icon box and the menu markup below are static/ARIA-only;
+  // renderReader stays pure, so the actual open/close toggling of
+  // aria-expanded/hidden is wired by the content script in a later phase.
+  if (post.actions.length > 0) {
+    const menuId = `${NS}-actions-${post.id}`;
+
+    box.classList.add(`${NS}-icon-box--menu`);
+    box.setAttribute('role', 'button');
+    box.setAttribute('tabindex', '0');
+    box.setAttribute('aria-haspopup', 'menu');
+    box.setAttribute('aria-expanded', 'false');
+    box.setAttribute('aria-controls', menuId);
+    box.title = 'Post actions';
+
+    const menu = el(doc, 'div', `${NS}-actions`);
+    menu.id = menuId;
+    menu.setAttribute('role', 'menu');
+    // Present from the start: the menu is closed until the content script's
+    // toggle handler reveals it, so the very first paint must already match.
+    menu.hidden = true;
+
+    for (const action of post.actions) {
+      const link = el(doc, 'a', `${NS}-action`) as HTMLAnchorElement;
+      link.setAttribute('role', 'menuitem');
+      link.href = action.href;
+      if (action.method != null) link.setAttribute('data-method', action.method);
+      if (action.rel != null) link.rel = action.rel;
+      link.title = action.label;
+
+      if (action.iconUrl) {
+        const icon = el(doc, 'img', `${NS}-action-icon`) as HTMLImageElement;
+        icon.src = action.iconUrl;
+        icon.alt = '';
+        icon.setAttribute('aria-hidden', 'true');
+        link.appendChild(icon);
+      }
+      link.appendChild(el(doc, 'span', `${NS}-action-label`, action.label));
+
+      menu.appendChild(link);
+    }
+
+    arm.appendChild(menu);
+  }
+
   return arm;
 }
 
@@ -242,6 +289,13 @@ export function renderReader(
       `${NS}-post ${NS}-post--${side} ${NS}-stripe-${stripe} ${isFirst ? `${NS}-post--first` : `${NS}-post--repeat`}`,
     );
     if (post.isOP) article.classList.add(`${NS}-post--op`);
+    // Server-rendered "linked/unread here" marker (glowfic's `.reply-highlighted`),
+    // scraped straight through onto the post — a static flag, not a live unread
+    // state, so it needs no listener to stay correct.
+    if (post.highlighted) {
+      article.classList.add(`${NS}-post--linked`);
+      article.setAttribute('data-glr-linked', '1');
+    }
     article.setAttribute('data-post-id', post.id);
     article.setAttribute('data-author', post.author);
     article.setAttribute('data-stripe', stripe);
