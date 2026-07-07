@@ -18,6 +18,7 @@ import {
   enableIconPreviews,
   applyMoieties,
 } from '../reader-core/index.js';
+import type { IconPreviewsHandle } from '../reader-core/index.js';
 import { applyMoietyRings } from './moiety.js';
 import { createControls, type Controls } from './controls.js';
 import { openOptionsPage } from './open-options.js';
@@ -33,10 +34,59 @@ import type { Options } from '../shared/options.js';
 // ---- Reader activation / restoration ----
 
 let readerEl: HTMLElement | null = null;
-let disablePreviews: (() => void) | null = null;
+let disablePreviews: IconPreviewsHandle | null = null;
+let disposeMenus: (() => void) | null = null;
 let controls: Controls | null = null;
 /** Last-known options; refreshed at init and on storage changes. */
 let options: Options = DEFAULT_OPTIONS;
+
+// ---- FOUC prevention (Req 4) ----
+//
+// The content script now runs at document_start (manifest.json), well before
+// `#content` paints. If the reader was left ON last session we hide `#content`
+// immediately (hideForFouc, called at module top level below) so the user never
+// sees a flash of the original glowfic markup before init() — which has to wait
+// for `.post-container` to exist — swaps it for the reader. mirrorEnabled() keeps
+// a plain localStorage copy of the enabled flag (separate from the async
+// storage.local read used everywhere else) so this synchronous, pre-DOMContentLoaded
+// check has something to read.
+
+/** Best-effort synchronous mirror of the enabled flag, written wherever the async
+ *  `options.enabled` changes so the NEXT page load's hideForFouc() can read it
+ *  synchronously (storage.local's API is async and unusable this early). */
+function mirrorEnabled(value: boolean): void {
+  try {
+    globalThis.localStorage?.setItem(STORAGE_KEYS.enabled, String(value));
+  } catch {
+    /* localStorage may be unavailable (private mode); mirror is best-effort. */
+  }
+}
+
+/** Synchronously hide `#content` if the reader was last left ON, so the original
+ *  markup never flashes before init() replaces it. Must run at module top level
+ *  (document_start), before `#content` has painted. Never throws. */
+function hideForFouc(): void {
+  try {
+    if (globalThis.localStorage?.getItem(STORAGE_KEYS.enabled) !== 'true') return;
+    const style = document.createElement('style');
+    style.id = 'glr-fouc-style';
+    style.textContent = '#content{visibility:hidden !important;}';
+    document.documentElement.appendChild(style);
+  } catch {
+    /* localStorage/DOM may be unavailable this early; never block the page. */
+  }
+}
+
+/** Idempotently lift the FOUC curtain installed by hideForFouc(). Safe to call
+ *  any number of times (init's success path, its error path, and the 3s
+ *  failsafe below may all call it). Never throws. */
+function revealAfterFouc(): void {
+  try {
+    document.getElementById('glr-fouc-style')?.remove();
+  } catch {
+    /* a stray style tag is harmless; never break the host page over it */
+  }
+}
 
 function detectTheme(): 'light' | 'dark' {
   try {
@@ -54,6 +104,224 @@ function detectTheme(): 'light' | 'dark' {
  *  Detection keys off the presence of a `.post-container`, never the OP. */
 function isThreadPage(): boolean {
   return document.querySelector('.post-container') !== null;
+}
+
+// ---- Re-scroll + highlight-on-enable (Req 1 & 2) ----
+
+/**
+ * PURE: resolve the post that `hash` (e.g. `location.hash`) points at, within
+ * `reader`. glowfic reply permalinks look like `#reply-{id}`; when one matches,
+ * find the post carrying that `data-post-id` (see render.ts). Returns null for
+ * any non-matching/absent hash. Does no scrolling or DOM mutation — a pure query
+ * — so it is unit-testable headlessly (exported for Phase 05). Never throws.
+ */
+export function resolveLinkedTarget(reader: HTMLElement, hash: string): HTMLElement | null {
+  try {
+    const match = /^#reply-(.+)$/.exec(hash ?? '');
+    if (!match) return null;
+    const id = decodeURIComponent(match[1]);
+    // CSS.escape may be absent (e.g. jsdom under test); fall back to a manual scan.
+    // We narrow with the querySelector<HTMLElement> generic rather than
+    // `instanceof HTMLElement`, because — like `Element` in dom.ts — `HTMLElement`
+    // is not a global in the plain-Node test runtime, so `instanceof` there would
+    // throw (and this helper is exported specifically to be tested headlessly).
+    const cssApi = (globalThis as { CSS?: { escape?: (value: string) => string } }).CSS;
+    if (cssApi && typeof cssApi.escape === 'function') {
+      return reader.querySelector<HTMLElement>(`[data-post-id="${cssApi.escape(id)}"]`);
+    }
+    for (const node of Array.from(reader.querySelectorAll<HTMLElement>('[data-post-id]'))) {
+      if (node.getAttribute('data-post-id') === id) return node;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Mark and scroll to the post the page landed on. A `#reply-{id}` hash wins (and
+ *  gets the same `glr-post--linked` marking a server-highlighted post would have,
+ *  since enabling the reader after following such a link should still call it
+ *  out); otherwise fall back to whatever render.ts already marked from
+ *  `post.highlighted`. Scrolling is deferred two animation frames so icon layout
+ *  (layoutIcons, above) has settled first. Never throws. */
+function applyLinkedHighlightAndScroll(reader: HTMLElement): void {
+  try {
+    let target = resolveLinkedTarget(reader, location.hash);
+    if (target) {
+      target.classList.add('glr-post--linked');
+      target.setAttribute('data-glr-linked', '1');
+    } else {
+      const fallback = reader.querySelector('.glr-post--linked');
+      target = fallback instanceof HTMLElement ? fallback : null;
+    }
+    if (!target) return;
+    const scrollTarget = target;
+    const raf = (globalThis as { requestAnimationFrame?: typeof requestAnimationFrame })
+      .requestAnimationFrame;
+    if (typeof raf === 'function' && typeof scrollTarget.scrollIntoView === 'function') {
+      raf(() => {
+        raf(() => {
+          scrollTarget.scrollIntoView({ block: 'start' });
+        });
+      });
+    }
+  } catch {
+    /* a missed scroll/highlight is a nicety, never worth breaking the page over */
+  }
+}
+
+// ---- Action-menu interaction wiring (Req 3) ----
+//
+// render.ts emits the trigger (`.glr-icon-box--menu`, ARIA-only, `aria-expanded`
+// permanently "false") and its menu (`.glr-actions`, permanently `hidden`) as
+// static markup — actually opening/closing them is this module's job. The trigger
+// and its menu are always siblings inside the same `.glr-arm` (box appended, then
+// menu — see buildArm), so we navigate between them via sibling links rather than
+// re-deriving a CSS selector from `aria-controls`/id (sidestepping any need for
+// `CSS.escape` there); `document.getElementById` is used only as a defensive
+// fallback if that structural assumption ever breaks.
+
+/** Suspend the hover preview while a menu is open (they'd otherwise overlap —
+ *  the popover sits right where the preview appears), resume once none are. */
+function syncPreviewSuspension(reader: HTMLElement): void {
+  try {
+    const anyMenuOpen = reader.querySelector('.glr-actions:not([hidden])') !== null;
+    disablePreviews?.setSuspended(anyMenuOpen);
+  } catch {
+    /* defensive */
+  }
+}
+
+/** Hide every open menu in `reader` and reset its trigger's `aria-expanded`. */
+function closeAllMenus(reader: HTMLElement): void {
+  try {
+    reader.querySelectorAll('.glr-actions:not([hidden])').forEach((menu) => {
+      if (!(menu instanceof HTMLElement)) return;
+      menu.hidden = true;
+      menu.classList.remove('glr-actions--open');
+      menu.parentElement?.classList.remove('glr-arm--menu-open');
+      const trigger = menu.previousElementSibling;
+      if (trigger instanceof HTMLElement && trigger.classList.contains('glr-icon-box--menu')) {
+        trigger.setAttribute('aria-expanded', 'false');
+      }
+    });
+  } catch {
+    /* defensive: a menu stuck open is harmless, never worth breaking the page */
+  }
+  syncPreviewSuspension(reader);
+}
+
+/** Find the menu a trigger controls (structural sibling lookup, id as fallback). */
+function findMenuForTrigger(reader: HTMLElement, trigger: HTMLElement): HTMLElement | null {
+  const sibling = trigger.nextElementSibling;
+  if (sibling instanceof HTMLElement && sibling.classList.contains('glr-actions')) {
+    return sibling;
+  }
+  const id = trigger.getAttribute('aria-controls');
+  if (!id) return null;
+  const byId = document.getElementById(id);
+  return byId instanceof HTMLElement && reader.contains(byId) ? byId : null;
+}
+
+function setMenuOpen(trigger: HTMLElement, menu: HTMLElement, open: boolean): void {
+  menu.hidden = !open;
+  menu.classList.toggle('glr-actions--open', open);
+  trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+  // The arm is its own stacking context (position:absolute + z-index in CSS),
+  // so the menu's own z-index can't outrank a LATER post's arm on its own —
+  // bump the whole arm above every other arm while its menu is open.
+  trigger.parentElement?.classList.toggle('glr-arm--menu-open', open);
+}
+
+/** Close whatever else is open, then toggle this trigger's own menu. */
+function toggleMenu(reader: HTMLElement, trigger: HTMLElement): void {
+  const menu = findMenuForTrigger(reader, trigger);
+  if (!menu) return;
+  const wasOpen = !menu.hidden;
+  closeAllMenus(reader);
+  if (!wasOpen) setMenuOpen(trigger, menu, true);
+  syncPreviewSuspension(reader);
+}
+
+/** Wire action-menu open/close interaction for one reader instance. Mirrors the
+ *  `disablePreviews` disposer pattern: returns a teardown that removes every
+ *  listener it added, including the document-level ones (which — unlike the
+ *  reader-root listeners — do NOT vanish when the reader subtree is unmounted, so
+ *  deactivate() MUST call the returned disposer). Never throws from a handler. */
+function setupMenuInteractions(reader: HTMLElement): () => void {
+  const onClick = (event: MouseEvent): void => {
+    try {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const trigger = target.closest('.glr-icon-box--menu');
+      if (!(trigger instanceof HTMLElement) || !reader.contains(trigger)) return;
+      toggleMenu(reader, trigger);
+    } catch {
+      /* defensive: never break host page click handling */
+    }
+  };
+
+  const onKeydown = (event: KeyboardEvent): void => {
+    try {
+      if (event.key === 'Escape') {
+        const openMenu = reader.querySelector('.glr-actions:not([hidden])');
+        const trigger =
+          openMenu instanceof HTMLElement ? openMenu.previousElementSibling : null;
+        closeAllMenus(reader);
+        if (trigger instanceof HTMLElement) trigger.focus();
+        return;
+      }
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const trigger = target.closest('.glr-icon-box--menu');
+      if (!(trigger instanceof HTMLElement) || !reader.contains(trigger)) return;
+      if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
+        // Space would otherwise scroll the page.
+        event.preventDefault();
+        toggleMenu(reader, trigger);
+      }
+    } catch {
+      /* defensive: never break host page keyboard handling */
+    }
+  };
+
+  // Outside-interaction close: a pointerdown anywhere that's not inside the arm
+  // holding an open menu (i.e. not inside that menu OR its trigger) closes it.
+  const onDocumentPointerDown = (event: PointerEvent): void => {
+    try {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      const openMenus = Array.from(reader.querySelectorAll('.glr-actions:not([hidden])'));
+      const insideAnOpenOne = openMenus.some((menu) => menu.parentElement?.contains(target));
+      if (!insideAnOpenOne) closeAllMenus(reader);
+    } catch {
+      /* defensive */
+    }
+  };
+
+  // The popover is absolutely positioned, so any scroll would leave it drifted
+  // relative to its trigger — simplest correct behaviour is to just close it.
+  const onDocumentScroll = (): void => {
+    try {
+      closeAllMenus(reader);
+    } catch {
+      /* defensive */
+    }
+  };
+
+  reader.addEventListener('click', onClick);
+  reader.addEventListener('keydown', onKeydown);
+  document.addEventListener('pointerdown', onDocumentPointerDown);
+  document.addEventListener('scroll', onDocumentScroll, { capture: true, passive: true });
+
+  return (): void => {
+    // The reader-root listeners vanish with the subtree on unmount regardless,
+    // but removing them explicitly is cheap and avoids relying on that.
+    reader.removeEventListener('click', onClick);
+    reader.removeEventListener('keydown', onKeydown);
+    document.removeEventListener('pointerdown', onDocumentPointerDown);
+    document.removeEventListener('scroll', onDocumentScroll, { capture: true });
+  };
 }
 
 function activate(): void {
@@ -87,6 +355,11 @@ function activate(): void {
   // Fetch and apply per-author moiety colour rings. Fire-and-forget — must not
   // block the initial render.
   if (options.moietyRings) void applyMoietyRings(reader);
+  // Wire action-menu open/close (Req 3); torn down in deactivate().
+  disposeMenus = setupMenuInteractions(reader);
+  // Mark + scroll to whatever post the page landed on (Req 1 & 2). Last, since it
+  // reads icon layout that must already be settled.
+  applyLinkedHighlightAndScroll(reader);
 }
 
 // Post heights — and therefore how far an icon may grow before meeting the next
@@ -105,6 +378,12 @@ function onResize(): void {
 }
 
 function deactivate(): void {
+  // Tear down the action-menu listeners before the reader goes away — the
+  // document-level ones do NOT vanish with the reader subtree, so this must run.
+  if (disposeMenus) {
+    disposeMenus();
+    disposeMenus = null;
+  }
   // Tear down the floating previews before the reader goes away.
   if (disablePreviews) {
     disablePreviews();
@@ -129,6 +408,11 @@ function reflectButton(): void {
 
 function setEnabled(value: boolean, persist: boolean): void {
   options = { ...options, enabled: value };
+  // Keep the synchronous localStorage mirror in sync on BOTH the persisting and
+  // non-persisting paths (the latter is how remote/other-tab changes arrive via
+  // onStorageChange → setEnabled(value, false)), so the next page load's
+  // hideForFouc() always sees the current state.
+  mirrorEnabled(value);
   if (options.enabled) {
     activate();
   } else {
@@ -192,8 +476,13 @@ function onStorageChange(changes: Record<string, { newValue?: unknown }>): void 
 }
 
 async function init(): Promise<void> {
-  // Bail out completely on non-thread pages — leave the page untouched.
-  if (!isThreadPage()) return;
+  // Bail out completely on non-thread pages — leave the page untouched. Reveal
+  // immediately rather than waiting on the 3s failsafe: there's nothing left to
+  // mount, so the curtain (if hideForFouc raised one) has nothing to wait for.
+  if (!isThreadPage()) {
+    revealAfterFouc();
+    return;
+  }
 
   mountControls();
   document.addEventListener('keydown', onKeydown, true);
@@ -202,13 +491,42 @@ async function init(): Promise<void> {
 
   // Restore remembered state (everything OFF by default).
   options = await loadOptions();
+  // Sync the localStorage mirror to what we just loaded, so it can't go stale
+  // between now and the next setEnabled() call (e.g. this tab never toggles).
+  mirrorEnabled(options.enabled);
   if (options.enabled) {
     activate();
   }
   reflectButton();
+  // Lift the FOUC curtain now that the reader is mounted (enabled) or we've
+  // confirmed it should stay off (disabled) — either way the decision is final.
+  revealAfterFouc();
 }
 
-init().catch((err) => {
-  // Surface, never swallow — but never break the host page either.
-  console.error('[glowficlog] initialisation failed', err);
-});
+// Runs synchronously at document_start, before `#content` has painted: hide the
+// original page immediately if the reader was left ON last time, so there is no
+// flash of the un-reformatted markup before init() — deferred below to
+// DOMContentLoaded, since it needs `.post-container` to exist — mounts the reader.
+hideForFouc();
+// Failsafe: if init() never runs to completion (a script error, a future change
+// to the logic above, etc.) the curtain must still lift — a blank page must never
+// persist indefinitely.
+setTimeout(revealAfterFouc, 3000);
+
+function run(): void {
+  init().catch((err) => {
+    // Surface, never swallow — but never break the host page either. And make
+    // sure a failed init can never leave the page hidden behind the FOUC curtain.
+    console.error('[glowficlog] initialisation failed', err);
+    revealAfterFouc();
+  });
+}
+
+// init() needs `.post-container`, which does not exist yet at document_start —
+// defer it to DOMContentLoaded (or run immediately if the document has already
+// finished loading, e.g. this script were ever injected late).
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', run, { once: true });
+} else {
+  run();
+}

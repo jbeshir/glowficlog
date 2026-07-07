@@ -27,6 +27,8 @@ function makePost(id: string, author: string): Post {
     author,
     bodyHtml: '<p>Hello</p>',
     permalink: null,
+    highlighted: false,
+    actions: [],
   };
 }
 
