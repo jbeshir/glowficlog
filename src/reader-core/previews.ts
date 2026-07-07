@@ -27,21 +27,31 @@ const EDGE_GAP = 8;
 /** `.glr-icon-preview` padding (px) — kept in sync with reader.css. */
 const FRAME = 4;
 
+/** Handle returned by {@link enableIconPreviews}: call it to tear down (same as
+ *  before), or call `.setSuspended(true)` to hide-and-ignore-hover while
+ *  something else (the action-menu popover) occupies the same screen space. */
+export type IconPreviewsHandle = (() => void) & {
+  setSuspended(suspended: boolean): void;
+};
+
 /**
  * Attach hover previews to every `.glr-icon-box` currently in `root`.
  * Idempotent per call site; returns a cleanup that removes all listeners and the
  * floating preview node. Safe in headless DOMs (it never assumes layout exists).
  */
-export function enableIconPreviews(root: HTMLElement): () => void {
+export function enableIconPreviews(root: HTMLElement): IconPreviewsHandle {
   const doc = root.ownerDocument;
   const win = doc?.defaultView ?? null;
   const body = doc?.body ?? null;
-  if (!doc || !body) return () => {};
+  if (!doc || !body) return Object.assign(() => {}, { setSuspended() {} });
 
   let preview: HTMLDivElement | null = null;
   let previewImg: HTMLImageElement | null = null;
   let showTimer: ReturnType<typeof setTimeout> | null = null;
   let currentBox: HTMLElement | null = null;
+  // While true, hover is ignored entirely and any visible preview is hidden —
+  // set while a `.glr-actions` popover is open so the two never overlap.
+  let suspended = false;
 
   function ensurePreview(): { wrap: HTMLDivElement; img: HTMLImageElement } {
     if (preview && previewImg) return { wrap: preview, img: previewImg };
@@ -77,6 +87,11 @@ export function enableIconPreviews(root: HTMLElement): () => void {
     clearShowTimer();
     currentBox = null;
     if (preview) preview.classList.remove('glr-icon-preview--visible');
+  }
+
+  function setSuspended(value: boolean): void {
+    suspended = value;
+    if (suspended) hide();
   }
 
   function show(box: HTMLElement, src: string, natW: number, natH: number): void {
@@ -121,6 +136,7 @@ export function enableIconPreviews(root: HTMLElement): () => void {
   }
 
   function onEnter(ev: Event): void {
+    if (suspended) return;
     const box = ev.currentTarget as HTMLElement;
     const img = box.querySelector<HTMLImageElement>('.glr-icon');
     // Monogram fallbacks (iconless or broken-image) have no real <img> → skip.
@@ -131,7 +147,7 @@ export function enableIconPreviews(root: HTMLElement): () => void {
     clearShowTimer();
     showTimer = setTimeout(() => {
       showTimer = null;
-      if (currentBox !== box || !box.isConnected) return;
+      if (suspended || currentBox !== box || !box.isConnected) return;
       show(box, src, img.naturalWidth, img.naturalHeight);
     }, SHOW_DELAY);
   }
@@ -150,16 +166,19 @@ export function enableIconPreviews(root: HTMLElement): () => void {
   const onScroll = (): void => hide();
   win?.addEventListener?.('scroll', onScroll, true);
 
-  return () => {
-    clearShowTimer();
-    for (const box of boxes) {
-      box.removeEventListener('mouseenter', onEnter);
-      box.removeEventListener('mouseleave', onLeave);
-    }
-    win?.removeEventListener?.('scroll', onScroll, true);
-    if (preview) preview.remove();
-    preview = null;
-    previewImg = null;
-    currentBox = null;
-  };
+  return Object.assign(
+    () => {
+      clearShowTimer();
+      for (const box of boxes) {
+        box.removeEventListener('mouseenter', onEnter);
+        box.removeEventListener('mouseleave', onLeave);
+      }
+      win?.removeEventListener?.('scroll', onScroll, true);
+      if (preview) preview.remove();
+      preview = null;
+      previewImg = null;
+      currentBox = null;
+    },
+    { setSuspended },
+  );
 }

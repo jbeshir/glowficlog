@@ -25,5 +25,6 @@ export {
   unmountReader,
   HIDDEN_ORIGINAL_CLASS,
 } from './dom.js';
+export type { IconPreviewsHandle } from './previews.js';
 export { enableIconPreviews } from './previews.js';
 export { applyMoieties } from './moiety.js';

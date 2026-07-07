@@ -51,11 +51,11 @@
   --glr-stripe-a: rgba(27, 27, 31, 0.045);
   --glr-stripe-b: rgba(27, 27, 31, 0.09);
   /* "Linked/unread here" accent (Req 1) — glowfic's red convention for a post
-     that links back to "here". A solid ring colour plus a matched low-alpha
-     wash for the band fill (no color-mix: this file composites tints as
-     opaque layers instead, see the stripe-tint comment above). */
+     that links back to "here". Ring/border/outline only, deliberately no fill:
+     the band/connector/arm share one per-author stripe tint (see that comment
+     below), and a red wash on just the band would shift its tint out of sync
+     with the connector and arm, breaking that shared-colour contract. */
   --glr-linked: #ff0000;
-  --glr-linked-wash: rgba(255, 0, 0, 0.07);
 
   box-sizing: border-box;
   width: 100%;
@@ -83,7 +83,6 @@
   --glr-stripe-b: rgba(230, 231, 234, 0.1);
   /* Softened so pure red doesn't glare against a dark background. */
   --glr-linked: #ff5a5a;
-  --glr-linked-wash: rgba(255, 90, 90, 0.14);
 }
 
 .glr-reader *,
@@ -184,24 +183,22 @@
 
 /*
  * Linked/unread-here treatment (Req 1): server-flagged posts (`.glr-post--linked`,
- * from `post.highlighted`) get a ring + wash on the band AND an accent on the icon
- * box, so the post reads as linked both at reading distance and from the gutter
- * alone (e.g. once the band has scrolled out of a narrow viewport). The wash uses
- * `inset 0 0 0 9999px` — a solid inset fill that still respects the band's
- * border-radius — layered under a crisp 2px ring in the same hue.
+ * from `post.highlighted`) get a ring on the band AND an accent outline on the
+ * icon box, so the post reads as linked both at reading distance and from the
+ * gutter alone (e.g. once the band has scrolled out of a narrow viewport).
+ * Deliberately border/outline only, no fill — the band/connector/arm share one
+ * per-author stripe tint (see that comment above); a wash on just the band would
+ * shift its tint out of sync with the connector and arm.
  */
 .glr-post--linked .glr-band {
-  box-shadow:
-    inset 0 0 0 2px var(--glr-linked),
-    inset 0 0 0 9999px var(--glr-linked-wash);
+  box-shadow: inset 0 0 0 2px var(--glr-linked);
 }
-/* Linked OP: keep BOTH the OP leading rail and the linked ring/wash — a single
+/* Linked OP: keep BOTH the OP leading rail and the linked ring — a single
    box-shadow declaration can't inherit from two class rules, so merge them here. */
 .glr-post--op.glr-post--linked .glr-band {
   box-shadow:
     inset 3px 0 0 0 var(--glr-chip-bg),
-    inset 0 0 0 2px var(--glr-linked),
-    inset 0 0 0 9999px var(--glr-linked-wash);
+    inset 0 0 0 2px var(--glr-linked);
 }
 /* Outline (not box-shadow) so it never fights the icon box's moiety-ring
    box-shadow — the two accents can coexist. */
@@ -257,6 +254,16 @@
 /* Hug the text column: place the box at the inner edge of its gutter. */
 .glr-post--left .glr-arm { right: calc(100% - var(--glr-gutter)); }
 .glr-post--right .glr-arm { left: calc(100% - var(--glr-gutter)); }
+
+/* Every arm sits at the same z-index:2, so without this a LATER post's arm
+   (later in DOM, same tier) paints over an EARLIER post's open action menu —
+   the menu's own huge z-index only ranks it among ITS OWN arm's children (see
+   the `.glr-actions` note above). Toggled by the content script alongside
+   `glr-actions--open`/`aria-expanded` so the whole arm briefly outranks every
+   other arm while its menu is open, then drops back to the shared tier. */
+.glr-arm--menu-open {
+  z-index: 2147483645;
+}
 
 /*
  * Icon box: the square picture/monogram inside the padded arm. layoutIcons
@@ -351,6 +358,11 @@
  * `glr-actions--open` class; either is enough to reveal the menu here.
  */
 .glr-actions {
+  /* NOTE: on desktop, `.glr-arm` is itself `position:absolute` with an explicit
+     z-index (below), so it establishes its OWN stacking context — this menu's
+     huge z-index only ranks it among that arm's own children, not against other
+     posts' arms. See `.glr-arm--menu-open` for the fix (mobile is unaffected:
+     the arm goes static there, so it doesn't trap the menu's z-index). */
   position: absolute;
   top: 100%;
   margin-top: 6px;
@@ -722,18 +734,16 @@
   }
 
   /* Linked/unread-here treatment (Req 1), mobile: .glr-band is display:none here,
-     so the ring + wash move onto the post box itself as a leading rail + fill —
-     same var-driven colours as desktop, just re-homed onto a visible element. */
+     so the ring moves onto the post box itself as a leading rail — same
+     var-driven colour as desktop, just re-homed onto a visible element. No fill,
+     for the same reason as desktop: it would desync from the icon arm's tint. */
   .glr-post--linked {
-    box-shadow:
-      inset 4px 0 0 0 var(--glr-linked),
-      inset 0 0 0 9999px var(--glr-linked-wash);
+    box-shadow: inset 4px 0 0 0 var(--glr-linked);
   }
   .glr-post--op.glr-post--linked {
     box-shadow:
       inset 3px 0 0 0 var(--glr-chip-bg),
-      inset 4px 0 0 0 var(--glr-linked),
-      inset 0 0 0 9999px var(--glr-linked-wash);
+      inset 4px 0 0 0 var(--glr-linked);
   }
 
   /* Actions popover (Req 3), mobile: .glr-arm is float:right/position:static

@@ -18,6 +18,7 @@ import {
   enableIconPreviews,
   applyMoieties,
 } from '../reader-core/index.js';
+import type { IconPreviewsHandle } from '../reader-core/index.js';
 import { applyMoietyRings } from './moiety.js';
 import { createControls, type Controls } from './controls.js';
 import { openOptionsPage } from './open-options.js';
@@ -33,7 +34,7 @@ import type { Options } from '../shared/options.js';
 // ---- Reader activation / restoration ----
 
 let readerEl: HTMLElement | null = null;
-let disablePreviews: (() => void) | null = null;
+let disablePreviews: IconPreviewsHandle | null = null;
 let disposeMenus: (() => void) | null = null;
 let controls: Controls | null = null;
 /** Last-known options; refreshed at init and on storage changes. */
@@ -180,6 +181,17 @@ function applyLinkedHighlightAndScroll(reader: HTMLElement): void {
 // `CSS.escape` there); `document.getElementById` is used only as a defensive
 // fallback if that structural assumption ever breaks.
 
+/** Suspend the hover preview while a menu is open (they'd otherwise overlap —
+ *  the popover sits right where the preview appears), resume once none are. */
+function syncPreviewSuspension(reader: HTMLElement): void {
+  try {
+    const anyMenuOpen = reader.querySelector('.glr-actions:not([hidden])') !== null;
+    disablePreviews?.setSuspended(anyMenuOpen);
+  } catch {
+    /* defensive */
+  }
+}
+
 /** Hide every open menu in `reader` and reset its trigger's `aria-expanded`. */
 function closeAllMenus(reader: HTMLElement): void {
   try {
@@ -187,6 +199,7 @@ function closeAllMenus(reader: HTMLElement): void {
       if (!(menu instanceof HTMLElement)) return;
       menu.hidden = true;
       menu.classList.remove('glr-actions--open');
+      menu.parentElement?.classList.remove('glr-arm--menu-open');
       const trigger = menu.previousElementSibling;
       if (trigger instanceof HTMLElement && trigger.classList.contains('glr-icon-box--menu')) {
         trigger.setAttribute('aria-expanded', 'false');
@@ -195,6 +208,7 @@ function closeAllMenus(reader: HTMLElement): void {
   } catch {
     /* defensive: a menu stuck open is harmless, never worth breaking the page */
   }
+  syncPreviewSuspension(reader);
 }
 
 /** Find the menu a trigger controls (structural sibling lookup, id as fallback). */
@@ -213,6 +227,10 @@ function setMenuOpen(trigger: HTMLElement, menu: HTMLElement, open: boolean): vo
   menu.hidden = !open;
   menu.classList.toggle('glr-actions--open', open);
   trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+  // The arm is its own stacking context (position:absolute + z-index in CSS),
+  // so the menu's own z-index can't outrank a LATER post's arm on its own —
+  // bump the whole arm above every other arm while its menu is open.
+  trigger.parentElement?.classList.toggle('glr-arm--menu-open', open);
 }
 
 /** Close whatever else is open, then toggle this trigger's own menu. */
@@ -222,6 +240,7 @@ function toggleMenu(reader: HTMLElement, trigger: HTMLElement): void {
   const wasOpen = !menu.hidden;
   closeAllMenus(reader);
   if (!wasOpen) setMenuOpen(trigger, menu, true);
+  syncPreviewSuspension(reader);
 }
 
 /** Wire action-menu open/close interaction for one reader instance. Mirrors the
