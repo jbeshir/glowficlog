@@ -504,6 +504,8 @@ function post(
     author,
     bodyHtml: '',
     permalink: null,
+    highlighted: false,
+    actions: [],
   });
 }
 
