@@ -4,7 +4,7 @@
 //   - paginated view: character/author/icon wrapped in <a>
 // Every field is null-guarded; malformed or absent markup yields nulls, never throws.
 
-import type { Post } from './types.js';
+import type { Post, PostAction } from './types.js';
 import { renderedPostContainers } from './dom.js';
 
 /** Collapse internal whitespace and trim; return null for empty results. */
@@ -36,6 +36,65 @@ function deriveId(container: Element, index: number, permalink: string | null): 
   }
   // Last resort: positional, stable within a single parse.
   return `pos-${index}`;
+}
+
+/** Fallback label used when an action has neither an icon title/alt nor link text. */
+function defaultLabelForKind(kind: PostAction['kind']): string {
+  switch (kind) {
+    case 'permalink':
+      return 'Permalink';
+    case 'unread':
+      return 'Mark Unread';
+    case 'bookmark':
+      return 'Bookmark';
+    default:
+      return 'Action';
+  }
+}
+
+/** Scrape the `.post-edit-box` anchors (permalink/mark-unread/bookmark/etc) into
+ *  immutable PostAction entries. Anchors without a usable href are skipped;
+ *  everything else is null-guarded so malformed markup never throws. */
+function deriveActions(container: Element): readonly PostAction[] {
+  const editBox = container.querySelector('.post-edit-box');
+  if (!editBox) return Object.freeze([]);
+
+  const anchors = Array.from(editBox.querySelectorAll('a'));
+  const actions: PostAction[] = [];
+  for (const anchor of anchors) {
+    const href = anchor.getAttribute('href');
+    if (!href) continue;
+
+    const method = anchor.getAttribute('data-method');
+    const rel = anchor.getAttribute('rel');
+    const img = anchor.querySelector('img');
+    const iconUrl = img?.getAttribute('src') ?? null;
+    const rawLabel =
+      img?.getAttribute('title') ?? img?.getAttribute('alt') ?? cleanText(anchor);
+
+    const kind: PostAction['kind'] = rel?.includes('alternate')
+      ? 'permalink'
+      : href.includes('unread=') || /unread/i.test(rawLabel ?? '')
+        ? 'unread'
+        : /bookmark/i.test(href) || /bookmark/i.test(rawLabel ?? '')
+          ? 'bookmark'
+          : 'other';
+
+    const label = rawLabel ?? defaultLabelForKind(kind);
+
+    actions.push(
+      Object.freeze({
+        kind,
+        label,
+        href,
+        method,
+        rel,
+        iconUrl,
+      }),
+    );
+  }
+
+  return Object.freeze(actions);
 }
 
 /**
@@ -78,6 +137,12 @@ export function parsePosts(root: ParentNode): readonly Post[] {
         .querySelector('.post-edit-box a[rel="alternate"]')
         ?.getAttribute('href') ?? null;
 
+    // Server-rendered "linked/unread here" marker (e.g. from a #reply-N anchor
+    // or the site's own unread tracking) — carried verbatim as a class on the
+    // source container.
+    const highlighted = container.classList.contains('reply-highlighted');
+    const actions = deriveActions(container);
+
     const post: Post = {
       id: deriveId(container, index, permalink),
       isOP,
@@ -88,6 +153,8 @@ export function parsePosts(root: ParentNode): readonly Post[] {
       author,
       bodyHtml,
       permalink,
+      highlighted,
+      actions,
     };
     return Object.freeze(post);
   });

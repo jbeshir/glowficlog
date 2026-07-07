@@ -26,6 +26,29 @@ export interface Post {
   readonly bodyHtml: string;
   /** Permalink href (e.g. "/replies/123#reply-123" or "/posts/47494"), or null. */
   readonly permalink: string | null;
+  /** True when the source `.post-container` carried `.reply-highlighted` (glowfic's server-rendered "linked/unread here" marker). */
+  readonly highlighted: boolean;
+  /** Links scraped from `.post-edit-box` (permalink/unread/bookmark/other). Empty when the post has no edit box. */
+  readonly actions: readonly PostAction[];
+}
+
+/**
+ * One action link scraped from a post's `.post-edit-box` (permalink, mark
+ * unread here, bookmark, etc). Frozen, like {@link Post}.
+ */
+export interface PostAction {
+  /** Coarse classification derived from `rel`/`href`/`label`; `'other'` when none match. */
+  readonly kind: 'permalink' | 'unread' | 'bookmark' | 'other';
+  /** Human label from the icon img's title/alt, or the link text. */
+  readonly label: string;
+  /** Original href (may be relative). */
+  readonly href: string;
+  /** `data-method` attribute (e.g. "put"), or null when absent. */
+  readonly method: string | null;
+  /** `rel` attribute, or null when absent. */
+  readonly rel: string | null;
+  /** Original icon `<img>` src, or null when the anchor has no icon. */
+  readonly iconUrl: string | null;
 }
 
 /** Options for {@link renderReader}. `document` is injectable for headless testing. */
