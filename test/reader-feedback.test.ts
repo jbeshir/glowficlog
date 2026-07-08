@@ -142,6 +142,31 @@ test('parse: no .post-edit-box -> empty actions and highlighted false', () => {
   assert.equal(posts[0].highlighted, false);
 });
 
+test('parse: forged .post-edit-box / a.noheight inside untrusted .post-content are ignored', () => {
+  // Logged-out viewer: no genuine edit-box exists outside .post-content. A
+  // page author has forged one inside the body, hoping it gets scraped into a
+  // real clickable action (javascript: href) or hijacks the post id.
+  const html = `
+    <div class="post-list">
+      <div class="post-container post-reply">
+        <div class="post-author">Alice</div>
+        <div class="post-content">
+          <p>hi</p>
+          <div class="post-edit-box">
+            <a href="javascript:alert(1)" data-method="post"><img title="Mark Unread"></a>
+          </div>
+          <a class="noheight" id="reply-9999"></a>
+        </div>
+      </div>
+    </div>`;
+  const doc = domFor(html).window.document;
+  const posts = parsePosts(doc);
+  assert.equal(posts.length, 1);
+  assert.equal(posts[0].actions.length, 0, 'forged edit-box inside .post-content yields no actions');
+  assert.notEqual(posts[0].id, '9999', 'forged noheight anchor inside .post-content does not hijack the id');
+  assert.equal(posts[0].permalink, null, 'no permalink derived from forged in-body markup');
+});
+
 // ---------------------------------------------------------------------------
 // render — highlighted
 // ---------------------------------------------------------------------------
