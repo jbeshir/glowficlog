@@ -63,7 +63,12 @@
 .glr-reader {
   /* layout tunables */
   --glr-col-max: 920px;        /* text column max-width (reading column) */
-  --glr-gutter: 112px;         /* icon gutter = icon cap (96px) + 2 × icon-pad (16px) */
+  /* icon gutter = icon cap + 2 × icon-pad (96 + 2×8 = 112px). Derived from the
+     two vars below rather than hand-kept as a literal, so it can't drift out of
+     sync if the cap or pad changes. layout.ts independently recomputes the same
+     cap + 2×pad as its no-CSS fallback; keeping this expression here means the
+     one live source (this var) stays the derived truth. */
+  --glr-gutter: calc(var(--glr-icon-cap) + 2 * var(--glr-icon-pad));
   --glr-gap: 16px;             /* gap between gutter and body; also the connector length */
   --glr-post-gap: 16px;        /* vertical spacing BETWEEN posts (no dividers) */
   --glr-post-pad: 18px;        /* horizontal internal padding of each post body */
