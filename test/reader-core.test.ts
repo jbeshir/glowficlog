@@ -1,6 +1,6 @@
 // Headless tests for reader-core, run via tsx + node:test with jsdom.
-// This is the in-pipeline proxy for "the reader renders": we parse every real
-// fixture and assert the model, then render and assert the layout structure.
+// Parses every real fixture and asserts the model, then renders and asserts
+// the layout structure.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -319,7 +319,7 @@ test('absence variants: every edge case parses without throwing', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Change 1 — paginated reply pages (page 2+): a fragment with ONLY .post-reply
+// Paginated reply pages (page 2+): a fragment with ONLY .post-reply
 // containers and NO original post must still parse and render.
 // ---------------------------------------------------------------------------
 test('reply-only pagination: a fragment with no OP parses and renders', () => {
@@ -366,7 +366,7 @@ test('reply-only pagination: a fragment with no OP parses and renders', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Change 2 — the CRITICAL coloring rule: a gutter arm carries its OWN post's
+// The CRITICAL coloring rule: a gutter arm carries its OWN post's
 // stripe, never the neighbour's. With alternating parity, post 0 (left, stripe a)
 // and post 2 (left, stripe a) sit on the same side; the arm flowing through the
 // gutter beside the right-side post 1 must stay stripe a — owned by its icon's
@@ -408,7 +408,7 @@ test('gutter-arm tint follows the icon owner, not the adjacent text post', () =>
 });
 
 // ---------------------------------------------------------------------------
-// phase03 — Render-structure regression guard
+// Render-structure regression guard
 // The mobile layout (reader.css @media max-width:640px) is CSS-only; the
 // rendered DOM must be identical to desktop. These assertions lock in:
 //   (a) each post's stripe class — the hook .glr-post.glr-stripe-{a|b} uses

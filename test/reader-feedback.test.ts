@@ -1,4 +1,4 @@
-// Headless tests for Phase 05: highlighted posts, `.post-edit-box` derived
+// Headless tests for highlighted posts, `.post-edit-box` derived
 // actions (parse + render), and the pure `resolveLinkedTarget` content-script
 // helper. Mirrors the jsdom setup/import style of reader-core.test.ts.
 import { test } from 'node:test';
