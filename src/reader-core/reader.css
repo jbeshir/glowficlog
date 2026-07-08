@@ -11,20 +11,74 @@
  * called, so the reader still looks fine on its own.
  */
 
+/*
+ * z-index scale (--glr-z-*). The reader uses exactly these tiers; every
+ * z-index in this file is one of them (the lone exception is the mobile
+ * `.glr-arm { z-index: auto }` RESET, which is not a tier). Consolidated here
+ * so the stacking order is documented in ONE place instead of as six ad-hoc
+ * magic numbers scattered through the file.
+ *
+ * Defined at :root, NOT on .glr-reader, on purpose: two consumers
+ * (.glr-icon-preview and .glr-controls) are appended directly to <body>,
+ * OUTSIDE the .glr-reader subtree (see previews.ts / content.ts). CSS custom
+ * properties inherit down the DOM tree from where they are set, not from the
+ * CSS source — a property set only on .glr-reader would be invisible to those
+ * two elements, their var() would be invalid, and z-index would silently fall
+ * back to `auto` (a real stacking regression). :root is inherited by every
+ * consumer regardless of where it is mounted, and there is no shadow DOM in
+ * play, so :root is the real <html>.
+ *
+ * Tiers, low to high:
+ *   base        (0)           decorative fills behind the post text — the band
+ *                             and the connector.
+ *   body        (1)           the post's own text, painting above its band.
+ *   arm         (2)           the icon arm's shared per-post tier.
+ *   arm-active  (2147483645)  lifts a WHOLE arm above every sibling arm while
+ *                             its menu is open (.glr-arm--menu-open). Ranks the
+ *                             arm's own box at the shared root-level context.
+ *   menu        (2147483645)  the action-menu popover itself (.glr-actions), a
+ *                             child of .glr-arm. Because .glr-arm establishes
+ *                             its own stacking context, this value only ranks
+ *                             the menu among THAT arm's children — it never
+ *                             competes with other arms. A distinct token from
+ *                             arm-active (same value today, unrelated purpose)
+ *                             so the two can move independently later.
+ *   overlay     (2147483646)  topmost tier, SHARED by .glr-icon-preview and
+ *                             .glr-controls. These two DO compete in one real
+ *                             context (both position:fixed on <body>); their
+ *                             tie is broken by DOM insertion order (the preview
+ *                             is created lazily on first hover, always after the
+ *                             controls, so it paints on top). ONE shared token
+ *                             so that ordering invariant can't silently drift.
+ */
+:root {
+  --glr-z-base: 0;
+  --glr-z-body: 1;
+  --glr-z-arm: 2;
+  --glr-z-arm-active: 2147483645;
+  --glr-z-menu: 2147483645;
+  --glr-z-overlay: 2147483646;
+}
+
 .glr-reader {
   /* layout tunables */
   --glr-col-max: 920px;        /* text column max-width (reading column) */
-  --glr-gutter: 112px;         /* icon gutter = icon cap (96px) + 2 × icon-pad (16px) */
+  /* icon gutter = icon cap + 2 × icon-pad (96 + 2×8 = 112px). Derived from the
+     two vars below rather than hand-kept as a literal, so it can't drift out of
+     sync if the cap or pad changes. layout.ts independently recomputes the same
+     cap + 2×pad as its no-CSS fallback; keeping this expression here means the
+     one live source (this var) stays the derived truth. */
+  --glr-gutter: calc(var(--glr-icon-cap) + 2 * var(--glr-icon-pad));
   --glr-gap: 16px;             /* gap between gutter and body; also the connector length */
   --glr-post-gap: 16px;        /* vertical spacing BETWEEN posts (no dividers) */
-  --glr-post-pad: 18px;        /* horizontal internal padding of each post body (Req 4) */
+  --glr-post-pad: 18px;        /* horizontal internal padding of each post body */
   --glr-post-pad-y: 18px;      /* vertical internal padding; condensed mode shrinks this */
-  --glr-icon-pad: 8px;         /* symmetric padding around the icon in its tinted box (Req 1) */
-  --glr-connector-h: 12px;     /* thickness of the thin icon→body connector (Req 1) */
+  --glr-icon-pad: 8px;         /* symmetric padding around the icon in its tinted box */
+  --glr-connector-h: 12px;     /* thickness of the thin icon→body connector */
   --glr-radius: 12px;          /* rounding of the icon box and the body rectangle */
 
   /* body typography — host-sampled by applyTheme; these are the fallbacks for
-     the harness / when the host could not be sampled (Fix 2). */
+     the harness / when the host could not be sampled. */
   --glr-font-family: Helvetica, Verdana, sans-serif;
   --glr-font-size: 16px;
   --glr-line-height: 1.25;
@@ -50,7 +104,7 @@
      Low-alpha overlays so they read on light AND dark host themes. */
   --glr-stripe-a: rgba(27, 27, 31, 0.045);
   --glr-stripe-b: rgba(27, 27, 31, 0.09);
-  /* "Linked/unread here" accent (Req 1) — glowfic's red convention for a post
+  /* "Linked/unread here" accent — glowfic's red convention for a post
      that links back to "here". Ring/border/outline only, deliberately no fill:
      the band/connector/arm share one per-author stripe tint (see that comment
      below), and a red wash on just the band would shift its tint out of sync
@@ -63,7 +117,7 @@
   padding: 12px 0 48px;
   background: var(--glr-bg);
   color: var(--glr-fg);
-  /* Match the host post typography (Fix 2). */
+  /* Match the host post typography. */
   font-family: var(--glr-font-family);
   font-size: var(--glr-font-size);
   line-height: var(--glr-line-height);
@@ -173,7 +227,7 @@
   right: calc(var(--glr-gutter) + var(--glr-gap));
   border-radius: var(--glr-radius);
   pointer-events: none;
-  z-index: 0;
+  z-index: var(--glr-z-base);
 }
 
 /* OP gets a subtle accent rail down the leading edge of its body rectangle. */
@@ -182,7 +236,7 @@
 }
 
 /*
- * Linked/unread-here treatment (Req 1): server-flagged posts (`.glr-post--linked`,
+ * Linked/unread-here treatment: server-flagged posts (`.glr-post--linked`,
  * from `post.highlighted`) get a ring on the band AND an accent outline on the
  * icon box, so the post reads as linked both at reading distance and from the
  * gutter alone (e.g. once the band has scrolled out of a narrow viewport).
@@ -213,7 +267,7 @@
  * icon box's inner edge (the box sits `--glr-icon-pad` inside the gutter's inner
  * edge, so that edge is at `gutter − icon-pad`) with NO gap, and its BAND-SIDE
  * edge overlaps the band by 2px so the (opaque, same-tint) pieces fuse with no
- * seam (Fix 5). It spans, therefore, the icon padding + the full gap + a 2px band
+ * seam. It spans, therefore, the icon padding + the full gap + a 2px band
  * overlap. It sits at the post's first-line height — within the icon box's
  * vertical extent — so it reads as emanating from the icon box, identically on
  * left/right posts and on the first post / OP (whose accent rail is a band
@@ -225,7 +279,7 @@
   height: var(--glr-connector-h);
   width: calc(var(--glr-icon-pad) + var(--glr-gap) + 6px);
   pointer-events: none;
-  z-index: 0;
+  z-index: var(--glr-z-base);
 }
 .glr-post--left .glr-connector {
   left: calc(var(--glr-gutter) - var(--glr-icon-pad));
@@ -249,7 +303,7 @@
   height: fit-content;
   padding: var(--glr-icon-pad);
   border-radius: var(--glr-radius);
-  z-index: 2;
+  z-index: var(--glr-z-arm);
 }
 /* Hug the text column: place the box at the inner edge of its gutter. */
 .glr-post--left .glr-arm { right: calc(100% - var(--glr-gutter)); }
@@ -262,7 +316,7 @@
    `glr-actions--open`/`aria-expanded` so the whole arm briefly outranks every
    other arm while its menu is open, then drops back to the shared tier. */
 .glr-arm--menu-open {
-  z-index: 2147483645;
+  z-index: var(--glr-z-arm-active);
 }
 
 /*
@@ -314,7 +368,7 @@
 }
 
 /*
- * Full-size hover/focus preview (Fix 5). A SINGLE floating element is created by
+ * Full-size hover/focus preview. A SINGLE floating element is created by
  * enableIconPreviews() and appended to <body> — NOT nested in the reader — so no
  * ancestor `overflow` can clip it and showing it causes no layout shift. It is
  * `position: fixed` with a very high z-index, positioned next to the hovered icon
@@ -326,7 +380,7 @@
   position: fixed;
   top: 0;
   left: 0;
-  z-index: 2147483646;
+  z-index: var(--glr-z-overlay);
   margin: 0;
   padding: 4px;
   border-radius: 10px;
@@ -347,7 +401,7 @@
 }
 
 /*
- * Portrait action menu (Req 3): a small popover of post actions (mark unread
+ * Portrait action menu: a small popover of post actions (mark unread
  * here, bookmark, etc — scraped from glowfic's `.post-edit-box`), appended
  * inside `.glr-arm` right after `.glr-icon-box` and triggered from it (the
  * `.glr-icon-box--menu` role="button"). It is `position: absolute` against the
@@ -366,7 +420,7 @@
   position: absolute;
   top: 100%;
   margin-top: 6px;
-  z-index: 2147483645;
+  z-index: var(--glr-z-menu);
   min-width: 180px;
   padding: 4px;
   border-radius: var(--glr-radius);
@@ -445,7 +499,7 @@
    the tint. (grid-column + min-width are set with the layout rules above.) */
 .glr-body {
   position: relative;
-  z-index: 1;
+  z-index: var(--glr-z-body);
 }
 
 .glr-identity {
@@ -496,7 +550,7 @@
   opacity: 0.7;
 }
 
-/* Condensed repeat identity (Fix 3): the character name on a repeat post. Plain,
+/* Condensed repeat identity: the character name on a repeat post. Plain,
    readable text — deliberately NOT a pill and NOT a link: no background, no
    border-radius, no link colour, so it never reads as clickable. Bold foreground
    in the body font, marginally smaller than the first-appearance .glr-char, so it
@@ -527,7 +581,7 @@
   color: var(--glr-link);
 }
 
-/* Body typography (Fix 2 + Fix 3): full foreground colour and the host-sampled
+/* Body typography: full foreground colour and the host-sampled
    font/size/leading. There is NO inner measure cap — the text fills the post
    card's content box edge-to-edge (inset only by the card's --glr-post-pad), so
    the text width matches the post borders with no left-aligned dead space. */
@@ -575,7 +629,7 @@
   position: fixed;
   right: 16px;
   bottom: 16px;
-  z-index: 2147483646;
+  z-index: var(--glr-z-overlay);
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -733,7 +787,7 @@
     box-shadow: inset 3px 0 0 0 var(--glr-chip-bg);
   }
 
-  /* Linked/unread-here treatment (Req 1), mobile: .glr-band is display:none here,
+  /* Linked/unread-here treatment, mobile: .glr-band is display:none here,
      so the ring moves onto the post box itself as a leading rail — same
      var-driven colour as desktop, just re-homed onto a visible element. No fill,
      for the same reason as desktop: it would desync from the icon arm's tint. */
@@ -746,7 +800,7 @@
       inset 4px 0 0 0 var(--glr-linked);
   }
 
-  /* Actions popover (Req 3), mobile: .glr-arm is float:right/position:static
+  /* Actions popover, mobile: .glr-arm is float:right/position:static
      here, so it no longer anchors the popover — .glr-post (still position:relative)
      becomes the effective positioned ancestor. Re-anchor to the post's top-right
      corner, offset below the (now-floated) icon box's own rendered height. Equal

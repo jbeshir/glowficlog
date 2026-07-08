@@ -2,7 +2,7 @@
 // implementing the glowficlog reader layout. No global state, no mutation of the
 // input. The same posts + options always produce the same structure.
 //
-// Layout (see project brief / spec v4): one continuous centred column of post
+// Layout: one continuous centred column of post
 // bodies. Each post owns a subtle STRIPE tint (A/B by index parity) painted as
 // three connected pieces that read as one region:
 //   - a COMPACT icon BOX (the `.glr-arm`): the icon image plus a small symmetric
@@ -30,12 +30,12 @@ function resolveDocument(options: RenderOptions): Document {
   throw new Error('renderReader: no document available (pass options.document)');
 }
 
-function el(
+function el<K extends keyof HTMLElementTagNameMap>(
   doc: Document,
-  tag: string,
+  tag: K,
   className?: string,
   text?: string,
-): HTMLElement {
+): HTMLElementTagNameMap[K] {
   const node = doc.createElement(tag);
   if (className) node.className = className;
   if (text != null) node.textContent = text;
@@ -143,14 +143,14 @@ function buildArm(
   const box = el(doc, 'div', `${NS}-icon-box`);
 
   if (post.iconUrl) {
-    const img = el(doc, 'img', `${NS}-icon`) as HTMLImageElement;
+    const img = el(doc, 'img', `${NS}-icon`);
     img.src = post.iconUrl;
     img.alt = post.iconKeyword ?? post.character ?? post.author ?? '';
     img.title = title;
     img.loading = 'lazy';
     img.decoding = 'async';
     // The full-size hover preview is a single floating element managed by
-    // enableIconPreviews() (Fix 5) — not a per-post node — so it doesn't bloat
+    // enableIconPreviews() — not a per-post node — so it doesn't bloat
     // the markup or get clipped by an ancestor's overflow.
     // Broken/blocked icons (and offline screenshots) degrade to the monogram.
     // Set as a property (not an attribute) so it never appears in serialized
@@ -169,7 +169,7 @@ function buildArm(
   // (mark unread here, bookmark, etc — `.post-edit-box` links). The trigger
   // attributes on the icon box and the menu markup below are static/ARIA-only;
   // renderReader stays pure, so the actual open/close toggling of
-  // aria-expanded/hidden is wired by the content script in a later phase.
+  // aria-expanded/hidden is wired by the content script.
   if (post.actions.length > 0) {
     const menuId = `${NS}-actions-${post.id}`;
 
@@ -189,7 +189,7 @@ function buildArm(
     menu.hidden = true;
 
     for (const action of post.actions) {
-      const link = el(doc, 'a', `${NS}-action`) as HTMLAnchorElement;
+      const link = el(doc, 'a', `${NS}-action`);
       link.setAttribute('role', 'menuitem');
       link.href = action.href;
       if (action.method != null) link.setAttribute('data-method', action.method);
@@ -197,7 +197,7 @@ function buildArm(
       link.title = action.label;
 
       if (action.iconUrl) {
-        const icon = el(doc, 'img', `${NS}-action-icon`) as HTMLImageElement;
+        const icon = el(doc, 'img', `${NS}-action-icon`);
         icon.src = action.iconUrl;
         icon.alt = '';
         icon.setAttribute('aria-hidden', 'true');
@@ -242,7 +242,7 @@ function buildIdentity(doc: Document, post: Post, isFirst: boolean): HTMLElement
   }
 
   if (post.permalink) {
-    const link = el(doc, 'a', `${NS}-permalink`, '#') as HTMLAnchorElement;
+    const link = el(doc, 'a', `${NS}-permalink`, '#');
     link.href = post.permalink;
     link.title = 'Permalink to this post';
     link.target = '_blank';

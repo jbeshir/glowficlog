@@ -1,5 +1,6 @@
-// Tests for the commonAncestor helper the content script uses to locate the
-// post-list wrapper without assuming an original post exists.
+// Tests for the commonAncestor helper (nearest common ancestor of a set of
+// elements) and for mountReaderInPostList / unmountReader, which place and
+// remove the reader within the post list.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -109,7 +110,7 @@ test('commonAncestor: elements in separate trees share no ancestor', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Fix 1 — mountReaderInPostList / unmountReader: the reader is inserted BETWEEN
+// mountReaderInPostList / unmountReader: the reader is inserted BETWEEN
 // the top and bottom paginators (immediately before the first .post-container),
 // only .post-containers are hidden, paginators stay, and toggle-off restores.
 // ---------------------------------------------------------------------------
@@ -188,11 +189,11 @@ test('mountReaderInPostList: no containers → null (page left untouched)', () =
 });
 
 // ---------------------------------------------------------------------------
-// Fix 1 (real fixtures) — the reader must land BETWEEN the top and bottom
+// Real fixtures — the reader must land BETWEEN the top and bottom
 // paginators on BOTH the page-1 DOM (visible OP ABOVE the top nav) and the
 // page-2 DOM (collapsed OP inside `.post-expander > .hidden` BEFORE the top
 // nav). These use the actual captured `#content` markup, not a hand-built
-// stand-in, so they pin the exact placement the previous versions got wrong.
+// stand-in, so they pin the exact placement.
 // ---------------------------------------------------------------------------
 
 /** Order index of `el` among #content's direct children. */

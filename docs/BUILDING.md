@@ -52,7 +52,7 @@ npm run package
 ```
 
 Runs `node scripts/package.mjs`. Produces two zips in `web-ext-artifacts/`,
-where `<version>` is the `version` field in `manifest.json` (currently `0.1.5`):
+where `<version>` is the `version` field in `manifest.json` (currently `0.1.6`):
 
 - `glowficlog-firefox-<version>.zip` (built with web-ext)
 - `glowficlog-chrome-<version>.zip`

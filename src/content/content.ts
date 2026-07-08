@@ -17,6 +17,7 @@ import {
   unmountReader,
   enableIconPreviews,
   applyMoieties,
+  watchResize,
 } from '../reader-core/index.js';
 import type { IconPreviewsHandle } from '../reader-core/index.js';
 import { applyMoietyRings } from './moiety.js';
@@ -29,7 +30,7 @@ import {
   STORAGE_KEYS,
   DEFAULT_OPTIONS,
 } from '../shared/options.js';
-import type { Options } from '../shared/options.js';
+import type { Options, StorageChange } from '../shared/options.js';
 
 // ---- Reader activation / restoration ----
 
@@ -40,9 +41,9 @@ let controls: Controls | null = null;
 /** Last-known options; refreshed at init and on storage changes. */
 let options: Options = DEFAULT_OPTIONS;
 
-// ---- FOUC prevention (Req 4) ----
+// ---- FOUC prevention ----
 //
-// The content script now runs at document_start (manifest.json), well before
+// The content script runs at document_start (manifest.json), well before
 // `#content` paints. If the reader was left ON last session we hide `#content`
 // immediately (hideForFouc, called at module top level below) so the user never
 // sees a flash of the original glowfic markup before init() — which has to wait
@@ -106,14 +107,14 @@ function isThreadPage(): boolean {
   return document.querySelector('.post-container') !== null;
 }
 
-// ---- Re-scroll + highlight-on-enable (Req 1 & 2) ----
+// ---- Re-scroll + highlight-on-enable ----
 
 /**
  * PURE: resolve the post that `hash` (e.g. `location.hash`) points at, within
  * `reader`. glowfic reply permalinks look like `#reply-{id}`; when one matches,
  * find the post carrying that `data-post-id` (see render.ts). Returns null for
  * any non-matching/absent hash. Does no scrolling or DOM mutation — a pure query
- * — so it is unit-testable headlessly (exported for Phase 05). Never throws.
+ * — so it is unit-testable headlessly (exported for that reason). Never throws.
  */
 export function resolveLinkedTarget(reader: HTMLElement, hash: string): HTMLElement | null {
   try {
@@ -138,16 +139,23 @@ export function resolveLinkedTarget(reader: HTMLElement, hash: string): HTMLElem
   }
 }
 
-/** Mark and scroll to the post the page landed on. A `#reply-{id}` hash wins (and
- *  gets the same `glr-post--linked` marking a server-highlighted post would have,
- *  since enabling the reader after following such a link should still call it
- *  out); otherwise fall back to whatever render.ts already marked from
- *  `post.highlighted`. Scrolling is deferred two animation frames so icon layout
- *  (layoutIcons, above) has settled first. Never throws. */
+/** Mark and scroll to the post the page landed on. A `#reply-{id}` hash wins: it
+ *  is a more specific signal than glowfic's own server-rendered "first unread"
+ *  flag (`post.highlighted`, already marked by render.ts) and may point at a
+ *  different post, so it clears any existing `glr-post--linked` mark before
+ *  applying its own, keeping at most one post highlighted at a time. With no
+ *  hash, falls back to whatever render.ts already marked. Scrolling is deferred
+ *  two animation frames so icon layout (layoutIcons, above) has settled first.
+ *  Never throws. */
 function applyLinkedHighlightAndScroll(reader: HTMLElement): void {
   try {
     let target = resolveLinkedTarget(reader, location.hash);
     if (target) {
+      reader.querySelectorAll('.glr-post--linked').forEach((el) => {
+        if (el === target) return;
+        el.classList.remove('glr-post--linked');
+        el.removeAttribute('data-glr-linked');
+      });
       target.classList.add('glr-post--linked');
       target.setAttribute('data-glr-linked', '1');
     } else {
@@ -170,7 +178,7 @@ function applyLinkedHighlightAndScroll(reader: HTMLElement): void {
   }
 }
 
-// ---- Action-menu interaction wiring (Req 3) ----
+// ---- Action-menu interaction wiring ----
 //
 // render.ts emits the trigger (`.glr-icon-box--menu`, ARIA-only, `aria-expanded`
 // permanently "false") and its menu (`.glr-actions`, permanently `hidden`) as
@@ -355,26 +363,11 @@ function activate(): void {
   // Fetch and apply per-author moiety colour rings. Fire-and-forget — must not
   // block the initial render.
   if (options.moietyRings) void applyMoietyRings(reader);
-  // Wire action-menu open/close (Req 3); torn down in deactivate().
+  // Wire action-menu open/close; torn down in deactivate().
   disposeMenus = setupMenuInteractions(reader);
-  // Mark + scroll to whatever post the page landed on (Req 1 & 2). Last, since it
+  // Mark + scroll to whatever post the page landed on. Last, since it
   // reads icon layout that must already be settled.
   applyLinkedHighlightAndScroll(reader);
-}
-
-// Post heights — and therefore how far an icon may grow before meeting the next
-// same-side icon — change with viewport width, so re-flow icons on resize.
-let resizeTimer: ReturnType<typeof setTimeout> | null = null;
-function onResize(): void {
-  if (resizeTimer !== null) clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => {
-    resizeTimer = null;
-    if (readerEl) {
-      layoutIcons(readerEl);
-      // Width changed → bodies may wrap/unwrap, so re-evaluate single-line state.
-      markSingleLineBodies(readerEl);
-    }
-  }, 120);
 }
 
 function deactivate(): void {
@@ -438,7 +431,7 @@ function onKeydown(event: KeyboardEvent): void {
   // Alt+G toggles. Ignore when typing into fields.
   if (!event.altKey || event.ctrlKey || event.metaKey) return;
   if (event.key.toLowerCase() !== 'g') return;
-  const target = event.target as HTMLElement | null;
+  const target = event.target instanceof HTMLElement ? event.target : null;
   const tag = target?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
   event.preventDefault();
@@ -446,7 +439,7 @@ function onKeydown(event: KeyboardEvent): void {
 }
 
 /** Apply changes pushed from the options page (or another tab) live. */
-function onStorageChange(changes: Record<string, { newValue?: unknown }>): void {
+function onStorageChange(changes: Record<string, StorageChange>): void {
   if (STORAGE_KEYS.condensed in changes) {
     options = { ...options, condensed: changes[STORAGE_KEYS.condensed].newValue === true };
     // Pure styling — just toggle the class, no rebuild needed.
@@ -486,7 +479,7 @@ async function init(): Promise<void> {
 
   mountControls();
   document.addEventListener('keydown', onKeydown, true);
-  globalThis.addEventListener?.('resize', onResize);
+  watchResize(() => readerEl);
   onOptionsChanged(onStorageChange);
 
   // Restore remembered state (everything OFF by default).

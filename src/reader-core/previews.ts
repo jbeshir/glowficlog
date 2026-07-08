@@ -1,4 +1,4 @@
-// Icon hover preview (Fix 5). A clean, flicker-free, never-clipped enlarged
+// Icon hover preview. A clean, flicker-free, never-clipped enlarged
 // preview of an icon shown next to it on hover.
 //
 // Design: ONE floating element (`.glr-icon-preview`) is created lazily and
@@ -13,7 +13,7 @@
 
 /**
  * Longest-edge size (px) of the enlarged preview. The in-column icon caps at
- * ~96px and now renders at its true aspect ratio, so a same-size popover would
+ * ~96px and renders at its true aspect ratio, so a same-size popover would
  * look identical to the icon; this is deliberately well above that cap so the
  * preview is an obvious ZOOM. The image's longest edge is scaled to exactly this
  * (UP for the common ~100px icon, DOWN for large-resolution ones), preserving
@@ -27,8 +27,8 @@ const EDGE_GAP = 8;
 /** `.glr-icon-preview` padding (px) — kept in sync with reader.css. */
 const FRAME = 4;
 
-/** Handle returned by {@link enableIconPreviews}: call it to tear down (same as
- *  before), or call `.setSuspended(true)` to hide-and-ignore-hover while
+/** Handle returned by {@link enableIconPreviews}: call it to tear down, or call
+ *  `.setSuspended(true)` to hide-and-ignore-hover while
  *  something else (the action-menu popover) occupies the same screen space. */
 export type IconPreviewsHandle = (() => void) & {
   setSuspended(suspended: boolean): void;
@@ -44,6 +44,8 @@ export function enableIconPreviews(root: HTMLElement): IconPreviewsHandle {
   const win = doc?.defaultView ?? null;
   const body = doc?.body ?? null;
   if (!doc || !body) return Object.assign(() => {}, { setSuspended() {} });
+  const d = doc;
+  const b = body;
 
   let preview: HTMLDivElement | null = null;
   let previewImg: HTMLImageElement | null = null;
@@ -55,10 +57,10 @@ export function enableIconPreviews(root: HTMLElement): IconPreviewsHandle {
 
   function ensurePreview(): { wrap: HTMLDivElement; img: HTMLImageElement } {
     if (preview && previewImg) return { wrap: preview, img: previewImg };
-    const wrap = doc!.createElement('div');
+    const wrap = d.createElement('div');
     wrap.className = 'glr-icon-preview';
     wrap.setAttribute('aria-hidden', 'true');
-    const img = doc!.createElement('img');
+    const img = d.createElement('img');
     img.alt = '';
     wrap.appendChild(img);
     // The preview lives outside the reader subtree, so copy the reader's resolved
@@ -70,7 +72,7 @@ export function enableIconPreviews(root: HTMLElement): IconPreviewsHandle {
       if (bg) wrap.style.setProperty('--glr-bg', bg);
       if (shadow) wrap.style.setProperty('--glr-pop-shadow', shadow);
     }
-    body!.appendChild(wrap);
+    b.appendChild(wrap);
     preview = wrap;
     previewImg = img;
     return { wrap, img };

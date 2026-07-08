@@ -16,6 +16,7 @@ import {
   parsePosts,
   DEFAULT_ICON_OPTS,
   DEFAULT_ICON_PAD,
+  watchResize,
 } from '../src/reader-core/index.js';
 
 const OPTS = { min: 26, cap: 100, gap: 8 };
@@ -389,6 +390,131 @@ test('layoutIcons: honors a CSS --glr-icon-min:64px override (mobile media-query
     box.style.height, '64px',
     'fitIconBox square fallback at min(maxH=64, maxW=96)=64 — 64px floor is reachable',
   );
+});
+
+// ---------------------------------------------------------------------------
+// watchResize — debounced resize re-flow wiring
+// ---------------------------------------------------------------------------
+
+/** Node's `globalThis` has no built-in 'resize' event target (unlike a real
+ *  `window`), so stub `addEventListener`/`removeEventListener` to capture the
+ *  handler `watchResize` registers. `fireResize` invokes it directly, standing
+ *  in for a real `resize` event; `removedCount` proves the disposer actually
+ *  unregistered it. */
+function stubResizeTarget(): {
+  fireResize: () => void;
+  removedCount: () => number;
+  restore: () => void;
+} {
+  const g = globalThis as unknown as {
+    addEventListener?: (type: string, fn: () => void) => void;
+    removeEventListener?: (type: string, fn: () => void) => void;
+  };
+  const origAdd = g.addEventListener;
+  const origRemove = g.removeEventListener;
+  let handler: (() => void) | null = null;
+  let removed = 0;
+  g.addEventListener = (type, fn) => {
+    if (type === 'resize') handler = fn;
+  };
+  g.removeEventListener = (type, fn) => {
+    if (type === 'resize' && fn === handler) {
+      removed++;
+      handler = null;
+    }
+  };
+  return {
+    fireResize: () => handler?.(),
+    removedCount: () => removed,
+    restore: () => {
+      g.addEventListener = origAdd;
+      g.removeEventListener = origRemove;
+    },
+  };
+}
+
+const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+test('watchResize: a resize re-flows the current root once the debounce delay elapses', async () => {
+  const { fireResize, restore } = stubResizeTarget();
+  try {
+    const { reader } = readerWithPosts(1);
+    mockGeometry(reader, () => 0, 1000);
+    watchResize(() => reader, 10);
+
+    fireResize();
+    const box = reader.querySelector('.glr-icon-box') as HTMLElement;
+    assert.equal(box.style.width, '', 'no re-flow before the delay elapses');
+
+    await wait(30);
+    assert.equal(box.style.width, '100px', 'layoutIcons ran on the root after the delay');
+    // jsdom reports zero rect height for the unmeasured body → treated as single-line,
+    // which only happens if markSingleLineBodies actually ran.
+    assert.ok(
+      (reader.querySelector('.glr-post') as HTMLElement).classList.contains('glr-body--single'),
+      'markSingleLineBodies also ran',
+    );
+  } finally {
+    restore();
+  }
+});
+
+test('watchResize: multiple rapid resizes debounce to a single re-flow', async () => {
+  const { fireResize, restore } = stubResizeTarget();
+  try {
+    let getRootCalls = 0;
+    const reader = readerWithPosts(1).reader;
+    watchResize(() => {
+      getRootCalls++;
+      return reader;
+    }, 10);
+
+    fireResize();
+    fireResize();
+    fireResize();
+    await wait(30);
+
+    assert.equal(getRootCalls, 1, 'three rapid resizes collapse into a single re-flow');
+  } finally {
+    restore();
+  }
+});
+
+test('watchResize: a null root is a safe no-op', async () => {
+  const { fireResize, restore } = stubResizeTarget();
+  try {
+    let getRootCalls = 0;
+    watchResize(() => {
+      getRootCalls++;
+      return null;
+    }, 10);
+
+    fireResize();
+    await assert.doesNotReject(wait(30));
+    assert.equal(getRootCalls, 1, 'the timer still fires and calls getRoot once');
+  } finally {
+    restore();
+  }
+});
+
+test('watchResize: the returned disposer unregisters the listener', async () => {
+  const { fireResize, removedCount, restore } = stubResizeTarget();
+  try {
+    let getRootCalls = 0;
+    const dispose = watchResize(() => {
+      getRootCalls++;
+      return null;
+    }, 10);
+
+    dispose();
+    assert.equal(removedCount(), 1, 'disposer calls removeEventListener once');
+
+    fireResize(); // no-op: the stub's captured handler was cleared on removal
+    await wait(30);
+    assert.equal(getRootCalls, 0, 'a resize after dispose never re-fires the handler');
+  } finally {
+    restore();
+  }
 });
 
 // ---------------------------------------------------------------------------

@@ -2,13 +2,10 @@
 // (read-only, no mutation, never throws) so they can be unit-tested headlessly.
 
 /**
- * Lowest common ancestor of the given elements, walking `parentElement` chains.
- *
- * Used by the content script to locate the post-list wrapper from the page's
- * `.post-container`s WITHOUT assuming an original post exists (paginated reply
- * pages have none) — the reader is inserted relative to this wrapper rather than
- * to an OP. The result is INCLUSIVE: the LCA of a single element is that element
- * itself; callers that want the surrounding wrapper take its `parentElement`.
+ * Nearest common ancestor Element of the given elements, walking `parentElement`
+ * chains. The result is INCLUSIVE: the common ancestor of a single element is
+ * that element itself; callers that want the surrounding wrapper take its
+ * `parentElement`.
  *
  * Returns `null` for an empty input or when the elements share no ancestor
  * (e.g. they live in different detached trees).
@@ -84,10 +81,7 @@ export function renderedPostContainers(root: ParentNode): HTMLElement[] {
   // is used rather than `instanceof Element` because `Element` is not a global
   // in the plain-Node test runtime (only on a jsdom window).
   const ELEMENT_NODE = 1;
-  const stop =
-    (root as { nodeType?: number }).nodeType === ELEMENT_NODE
-      ? (root as unknown as Element).parentElement
-      : null;
+  const stop = root.nodeType === ELEMENT_NODE ? root.parentElement : null;
   return Array.from(root.querySelectorAll<HTMLElement>('.post-container')).filter(
     (el) => isRenderedContainer(el, stop),
   );

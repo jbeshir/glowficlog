@@ -23,9 +23,24 @@ function fieldText(container: Element, selector: string): string | null {
   return cleanText(box.querySelector('a')) ?? cleanText(box);
 }
 
-function deriveId(container: Element, index: number, permalink: string | null): string {
-  // Replies carry `<a class="noheight" id="reply-{n}">`.
-  const anchorId = container.querySelector('a.noheight')?.id;
+/** True when `match` is a real element that is NOT a descendant of `content`.
+ *  `.post-content` is untrusted page-author HTML, so chrome-derived queries
+ *  (edit-box, noheight anchor, permalink) must reject matches found inside it —
+ *  those are forged markup, not the genuine site-rendered chrome. */
+function outsideContent(match: Element | null, content: Element | null): match is Element {
+  return !!match && !(content?.contains(match) ?? false);
+}
+
+function deriveId(
+  container: Element,
+  index: number,
+  permalink: string | null,
+  content: Element | null,
+): string {
+  // Replies carry `<a class="noheight" id="reply-{n}">`; ignore a forged copy
+  // living inside untrusted `.post-content`.
+  const anchor = container.querySelector('a.noheight');
+  const anchorId = outsideContent(anchor, content) ? anchor?.id : undefined;
   if (anchorId && anchorId.startsWith('reply-')) {
     return anchorId.slice('reply-'.length);
   }
@@ -54,10 +69,12 @@ function defaultLabelForKind(kind: PostAction['kind']): string {
 
 /** Scrape the `.post-edit-box` anchors (permalink/mark-unread/bookmark/etc) into
  *  immutable PostAction entries. Anchors without a usable href are skipped;
- *  everything else is null-guarded so malformed markup never throws. */
-function deriveActions(container: Element): readonly PostAction[] {
+ *  everything else is null-guarded so malformed markup never throws. A
+ *  `.post-edit-box` found inside untrusted `.post-content` is forged and
+ *  treated as absent. */
+function deriveActions(container: Element, content: Element | null): readonly PostAction[] {
   const editBox = container.querySelector('.post-edit-box');
-  if (!editBox) return Object.freeze([]);
+  if (!outsideContent(editBox, content)) return Object.freeze([]);
 
   const anchors = Array.from(editBox.querySelectorAll('a'));
   const actions: PostAction[] = [];
@@ -132,19 +149,21 @@ export function parsePosts(root: ParentNode): readonly Post[] {
     const content = container.querySelector('.post-content');
     const bodyHtml = content ? content.innerHTML : '';
 
-    const permalink =
-      container
-        .querySelector('.post-edit-box a[rel="alternate"]')
-        ?.getAttribute('href') ?? null;
+    // A `.post-edit-box a[rel="alternate"]` found inside untrusted `.post-content`
+    // is forged and treated as absent.
+    const permalinkAnchor = container.querySelector('.post-edit-box a[rel="alternate"]');
+    const permalink = outsideContent(permalinkAnchor, content)
+      ? (permalinkAnchor?.getAttribute('href') ?? null)
+      : null;
 
     // Server-rendered "linked/unread here" marker (e.g. from a #reply-N anchor
     // or the site's own unread tracking) — carried verbatim as a class on the
     // source container.
     const highlighted = container.classList.contains('reply-highlighted');
-    const actions = deriveActions(container);
+    const actions = deriveActions(container, content);
 
     const post: Post = {
-      id: deriveId(container, index, permalink),
+      id: deriveId(container, index, permalink, content),
       isOP,
       iconUrl,
       iconKeyword,
