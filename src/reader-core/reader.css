@@ -11,6 +11,55 @@
  * called, so the reader still looks fine on its own.
  */
 
+/*
+ * z-index scale (--glr-z-*). The reader uses exactly these tiers; every
+ * z-index in this file is one of them (the lone exception is the mobile
+ * `.glr-arm { z-index: auto }` RESET, which is not a tier). Consolidated here
+ * so the stacking order is documented in ONE place instead of as six ad-hoc
+ * magic numbers scattered through the file.
+ *
+ * Defined at :root, NOT on .glr-reader, on purpose: two consumers
+ * (.glr-icon-preview and .glr-controls) are appended directly to <body>,
+ * OUTSIDE the .glr-reader subtree (see previews.ts / content.ts). CSS custom
+ * properties inherit down the DOM tree from where they are set, not from the
+ * CSS source — a property set only on .glr-reader would be invisible to those
+ * two elements, their var() would be invalid, and z-index would silently fall
+ * back to `auto` (a real stacking regression). :root is inherited by every
+ * consumer regardless of where it is mounted, and there is no shadow DOM in
+ * play, so :root is the real <html>.
+ *
+ * Tiers, low to high:
+ *   base        (0)           decorative fills behind the post text — the band
+ *                             and the connector.
+ *   body        (1)           the post's own text, painting above its band.
+ *   arm         (2)           the icon arm's shared per-post tier.
+ *   arm-active  (2147483645)  lifts a WHOLE arm above every sibling arm while
+ *                             its menu is open (.glr-arm--menu-open). Ranks the
+ *                             arm's own box at the shared root-level context.
+ *   menu        (2147483645)  the action-menu popover itself (.glr-actions), a
+ *                             child of .glr-arm. Because .glr-arm establishes
+ *                             its own stacking context, this value only ranks
+ *                             the menu among THAT arm's children — it never
+ *                             competes with other arms. A distinct token from
+ *                             arm-active (same value today, unrelated purpose)
+ *                             so the two can move independently later.
+ *   overlay     (2147483646)  topmost tier, SHARED by .glr-icon-preview and
+ *                             .glr-controls. These two DO compete in one real
+ *                             context (both position:fixed on <body>); their
+ *                             tie is broken by DOM insertion order (the preview
+ *                             is created lazily on first hover, always after the
+ *                             controls, so it paints on top). ONE shared token
+ *                             so that ordering invariant can't silently drift.
+ */
+:root {
+  --glr-z-base: 0;
+  --glr-z-body: 1;
+  --glr-z-arm: 2;
+  --glr-z-arm-active: 2147483645;
+  --glr-z-menu: 2147483645;
+  --glr-z-overlay: 2147483646;
+}
+
 .glr-reader {
   /* layout tunables */
   --glr-col-max: 920px;        /* text column max-width (reading column) */
@@ -173,7 +222,7 @@
   right: calc(var(--glr-gutter) + var(--glr-gap));
   border-radius: var(--glr-radius);
   pointer-events: none;
-  z-index: 0;
+  z-index: var(--glr-z-base);
 }
 
 /* OP gets a subtle accent rail down the leading edge of its body rectangle. */
@@ -225,7 +274,7 @@
   height: var(--glr-connector-h);
   width: calc(var(--glr-icon-pad) + var(--glr-gap) + 6px);
   pointer-events: none;
-  z-index: 0;
+  z-index: var(--glr-z-base);
 }
 .glr-post--left .glr-connector {
   left: calc(var(--glr-gutter) - var(--glr-icon-pad));
@@ -249,7 +298,7 @@
   height: fit-content;
   padding: var(--glr-icon-pad);
   border-radius: var(--glr-radius);
-  z-index: 2;
+  z-index: var(--glr-z-arm);
 }
 /* Hug the text column: place the box at the inner edge of its gutter. */
 .glr-post--left .glr-arm { right: calc(100% - var(--glr-gutter)); }
@@ -262,7 +311,7 @@
    `glr-actions--open`/`aria-expanded` so the whole arm briefly outranks every
    other arm while its menu is open, then drops back to the shared tier. */
 .glr-arm--menu-open {
-  z-index: 2147483645;
+  z-index: var(--glr-z-arm-active);
 }
 
 /*
@@ -326,7 +375,7 @@
   position: fixed;
   top: 0;
   left: 0;
-  z-index: 2147483646;
+  z-index: var(--glr-z-overlay);
   margin: 0;
   padding: 4px;
   border-radius: 10px;
@@ -366,7 +415,7 @@
   position: absolute;
   top: 100%;
   margin-top: 6px;
-  z-index: 2147483645;
+  z-index: var(--glr-z-menu);
   min-width: 180px;
   padding: 4px;
   border-radius: var(--glr-radius);
@@ -445,7 +494,7 @@
    the tint. (grid-column + min-width are set with the layout rules above.) */
 .glr-body {
   position: relative;
-  z-index: 1;
+  z-index: var(--glr-z-body);
 }
 
 .glr-identity {
@@ -575,7 +624,7 @@
   position: fixed;
   right: 16px;
   bottom: 16px;
-  z-index: 2147483646;
+  z-index: var(--glr-z-overlay);
   display: flex;
   flex-direction: row;
   align-items: center;
