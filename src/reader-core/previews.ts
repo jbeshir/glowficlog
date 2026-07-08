@@ -1,4 +1,4 @@
-// Icon hover preview (Fix 5). A clean, flicker-free, never-clipped enlarged
+// Icon hover preview. A clean, flicker-free, never-clipped enlarged
 // preview of an icon shown next to it on hover.
 //
 // Design: ONE floating element (`.glr-icon-preview`) is created lazily and
@@ -13,7 +13,7 @@
 
 /**
  * Longest-edge size (px) of the enlarged preview. The in-column icon caps at
- * ~96px and now renders at its true aspect ratio, so a same-size popover would
+ * ~96px and renders at its true aspect ratio, so a same-size popover would
  * look identical to the icon; this is deliberately well above that cap so the
  * preview is an obvious ZOOM. The image's longest edge is scaled to exactly this
  * (UP for the common ~100px icon, DOWN for large-resolution ones), preserving
@@ -27,8 +27,8 @@ const EDGE_GAP = 8;
 /** `.glr-icon-preview` padding (px) — kept in sync with reader.css. */
 const FRAME = 4;
 
-/** Handle returned by {@link enableIconPreviews}: call it to tear down (same as
- *  before), or call `.setSuspended(true)` to hide-and-ignore-hover while
+/** Handle returned by {@link enableIconPreviews}: call it to tear down, or call
+ *  `.setSuspended(true)` to hide-and-ignore-hover while
  *  something else (the action-menu popover) occupies the same screen space. */
 export type IconPreviewsHandle = (() => void) & {
   setSuspended(suspended: boolean): void;

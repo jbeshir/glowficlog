@@ -2,13 +2,10 @@
 // (read-only, no mutation, never throws) so they can be unit-tested headlessly.
 
 /**
- * Lowest common ancestor of the given elements, walking `parentElement` chains.
- *
- * Used by the content script to locate the post-list wrapper from the page's
- * `.post-container`s WITHOUT assuming an original post exists (paginated reply
- * pages have none) — the reader is inserted relative to this wrapper rather than
- * to an OP. The result is INCLUSIVE: the LCA of a single element is that element
- * itself; callers that want the surrounding wrapper take its `parentElement`.
+ * Nearest common ancestor Element of the given elements, walking `parentElement`
+ * chains. The result is INCLUSIVE: the common ancestor of a single element is
+ * that element itself; callers that want the surrounding wrapper take its
+ * `parentElement`.
  *
  * Returns `null` for an empty input or when the elements share no ancestor
  * (e.g. they live in different detached trees).

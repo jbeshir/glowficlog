@@ -17,14 +17,14 @@
   --glr-gutter: 112px;         /* icon gutter = icon cap (96px) + 2 × icon-pad (16px) */
   --glr-gap: 16px;             /* gap between gutter and body; also the connector length */
   --glr-post-gap: 16px;        /* vertical spacing BETWEEN posts (no dividers) */
-  --glr-post-pad: 18px;        /* horizontal internal padding of each post body (Req 4) */
+  --glr-post-pad: 18px;        /* horizontal internal padding of each post body */
   --glr-post-pad-y: 18px;      /* vertical internal padding; condensed mode shrinks this */
-  --glr-icon-pad: 8px;         /* symmetric padding around the icon in its tinted box (Req 1) */
-  --glr-connector-h: 12px;     /* thickness of the thin icon→body connector (Req 1) */
+  --glr-icon-pad: 8px;         /* symmetric padding around the icon in its tinted box */
+  --glr-connector-h: 12px;     /* thickness of the thin icon→body connector */
   --glr-radius: 12px;          /* rounding of the icon box and the body rectangle */
 
   /* body typography — host-sampled by applyTheme; these are the fallbacks for
-     the harness / when the host could not be sampled (Fix 2). */
+     the harness / when the host could not be sampled. */
   --glr-font-family: Helvetica, Verdana, sans-serif;
   --glr-font-size: 16px;
   --glr-line-height: 1.25;
@@ -50,7 +50,7 @@
      Low-alpha overlays so they read on light AND dark host themes. */
   --glr-stripe-a: rgba(27, 27, 31, 0.045);
   --glr-stripe-b: rgba(27, 27, 31, 0.09);
-  /* "Linked/unread here" accent (Req 1) — glowfic's red convention for a post
+  /* "Linked/unread here" accent — glowfic's red convention for a post
      that links back to "here". Ring/border/outline only, deliberately no fill:
      the band/connector/arm share one per-author stripe tint (see that comment
      below), and a red wash on just the band would shift its tint out of sync
@@ -63,7 +63,7 @@
   padding: 12px 0 48px;
   background: var(--glr-bg);
   color: var(--glr-fg);
-  /* Match the host post typography (Fix 2). */
+  /* Match the host post typography. */
   font-family: var(--glr-font-family);
   font-size: var(--glr-font-size);
   line-height: var(--glr-line-height);
@@ -182,7 +182,7 @@
 }
 
 /*
- * Linked/unread-here treatment (Req 1): server-flagged posts (`.glr-post--linked`,
+ * Linked/unread-here treatment: server-flagged posts (`.glr-post--linked`,
  * from `post.highlighted`) get a ring on the band AND an accent outline on the
  * icon box, so the post reads as linked both at reading distance and from the
  * gutter alone (e.g. once the band has scrolled out of a narrow viewport).
@@ -213,7 +213,7 @@
  * icon box's inner edge (the box sits `--glr-icon-pad` inside the gutter's inner
  * edge, so that edge is at `gutter − icon-pad`) with NO gap, and its BAND-SIDE
  * edge overlaps the band by 2px so the (opaque, same-tint) pieces fuse with no
- * seam (Fix 5). It spans, therefore, the icon padding + the full gap + a 2px band
+ * seam. It spans, therefore, the icon padding + the full gap + a 2px band
  * overlap. It sits at the post's first-line height — within the icon box's
  * vertical extent — so it reads as emanating from the icon box, identically on
  * left/right posts and on the first post / OP (whose accent rail is a band
@@ -314,7 +314,7 @@
 }
 
 /*
- * Full-size hover/focus preview (Fix 5). A SINGLE floating element is created by
+ * Full-size hover/focus preview. A SINGLE floating element is created by
  * enableIconPreviews() and appended to <body> — NOT nested in the reader — so no
  * ancestor `overflow` can clip it and showing it causes no layout shift. It is
  * `position: fixed` with a very high z-index, positioned next to the hovered icon
@@ -347,7 +347,7 @@
 }
 
 /*
- * Portrait action menu (Req 3): a small popover of post actions (mark unread
+ * Portrait action menu: a small popover of post actions (mark unread
  * here, bookmark, etc — scraped from glowfic's `.post-edit-box`), appended
  * inside `.glr-arm` right after `.glr-icon-box` and triggered from it (the
  * `.glr-icon-box--menu` role="button"). It is `position: absolute` against the
@@ -496,7 +496,7 @@
   opacity: 0.7;
 }
 
-/* Condensed repeat identity (Fix 3): the character name on a repeat post. Plain,
+/* Condensed repeat identity: the character name on a repeat post. Plain,
    readable text — deliberately NOT a pill and NOT a link: no background, no
    border-radius, no link colour, so it never reads as clickable. Bold foreground
    in the body font, marginally smaller than the first-appearance .glr-char, so it
@@ -527,7 +527,7 @@
   color: var(--glr-link);
 }
 
-/* Body typography (Fix 2 + Fix 3): full foreground colour and the host-sampled
+/* Body typography: full foreground colour and the host-sampled
    font/size/leading. There is NO inner measure cap — the text fills the post
    card's content box edge-to-edge (inset only by the card's --glr-post-pad), so
    the text width matches the post borders with no left-aligned dead space. */
@@ -733,7 +733,7 @@
     box-shadow: inset 3px 0 0 0 var(--glr-chip-bg);
   }
 
-  /* Linked/unread-here treatment (Req 1), mobile: .glr-band is display:none here,
+  /* Linked/unread-here treatment, mobile: .glr-band is display:none here,
      so the ring moves onto the post box itself as a leading rail — same
      var-driven colour as desktop, just re-homed onto a visible element. No fill,
      for the same reason as desktop: it would desync from the icon arm's tint. */
@@ -746,7 +746,7 @@
       inset 4px 0 0 0 var(--glr-linked);
   }
 
-  /* Actions popover (Req 3), mobile: .glr-arm is float:right/position:static
+  /* Actions popover, mobile: .glr-arm is float:right/position:static
      here, so it no longer anchors the popover — .glr-post (still position:relative)
      becomes the effective positioned ancestor. Re-anchor to the post's top-right
      corner, offset below the (now-floated) icon box's own rendered height. Equal

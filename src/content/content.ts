@@ -40,9 +40,9 @@ let controls: Controls | null = null;
 /** Last-known options; refreshed at init and on storage changes. */
 let options: Options = DEFAULT_OPTIONS;
 
-// ---- FOUC prevention (Req 4) ----
+// ---- FOUC prevention ----
 //
-// The content script now runs at document_start (manifest.json), well before
+// The content script runs at document_start (manifest.json), well before
 // `#content` paints. If the reader was left ON last session we hide `#content`
 // immediately (hideForFouc, called at module top level below) so the user never
 // sees a flash of the original glowfic markup before init() — which has to wait
@@ -106,14 +106,14 @@ function isThreadPage(): boolean {
   return document.querySelector('.post-container') !== null;
 }
 
-// ---- Re-scroll + highlight-on-enable (Req 1 & 2) ----
+// ---- Re-scroll + highlight-on-enable ----
 
 /**
  * PURE: resolve the post that `hash` (e.g. `location.hash`) points at, within
  * `reader`. glowfic reply permalinks look like `#reply-{id}`; when one matches,
  * find the post carrying that `data-post-id` (see render.ts). Returns null for
  * any non-matching/absent hash. Does no scrolling or DOM mutation — a pure query
- * — so it is unit-testable headlessly (exported for Phase 05). Never throws.
+ * — so it is unit-testable headlessly (exported for that reason). Never throws.
  */
 export function resolveLinkedTarget(reader: HTMLElement, hash: string): HTMLElement | null {
   try {
@@ -170,7 +170,7 @@ function applyLinkedHighlightAndScroll(reader: HTMLElement): void {
   }
 }
 
-// ---- Action-menu interaction wiring (Req 3) ----
+// ---- Action-menu interaction wiring ----
 //
 // render.ts emits the trigger (`.glr-icon-box--menu`, ARIA-only, `aria-expanded`
 // permanently "false") and its menu (`.glr-actions`, permanently `hidden`) as
@@ -355,9 +355,9 @@ function activate(): void {
   // Fetch and apply per-author moiety colour rings. Fire-and-forget — must not
   // block the initial render.
   if (options.moietyRings) void applyMoietyRings(reader);
-  // Wire action-menu open/close (Req 3); torn down in deactivate().
+  // Wire action-menu open/close; torn down in deactivate().
   disposeMenus = setupMenuInteractions(reader);
-  // Mark + scroll to whatever post the page landed on (Req 1 & 2). Last, since it
+  // Mark + scroll to whatever post the page landed on. Last, since it
   // reads icon layout that must already be settled.
   applyLinkedHighlightAndScroll(reader);
 }
