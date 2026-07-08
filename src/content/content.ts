@@ -139,16 +139,23 @@ export function resolveLinkedTarget(reader: HTMLElement, hash: string): HTMLElem
   }
 }
 
-/** Mark and scroll to the post the page landed on. A `#reply-{id}` hash wins (and
- *  gets the same `glr-post--linked` marking a server-highlighted post would have,
- *  since enabling the reader after following such a link should still call it
- *  out); otherwise fall back to whatever render.ts already marked from
- *  `post.highlighted`. Scrolling is deferred two animation frames so icon layout
- *  (layoutIcons, above) has settled first. Never throws. */
+/** Mark and scroll to the post the page landed on. A `#reply-{id}` hash wins: it
+ *  is a more specific signal than glowfic's own server-rendered "first unread"
+ *  flag (`post.highlighted`, already marked by render.ts) and may point at a
+ *  different post, so it clears any existing `glr-post--linked` mark before
+ *  applying its own, keeping at most one post highlighted at a time. With no
+ *  hash, falls back to whatever render.ts already marked. Scrolling is deferred
+ *  two animation frames so icon layout (layoutIcons, above) has settled first.
+ *  Never throws. */
 function applyLinkedHighlightAndScroll(reader: HTMLElement): void {
   try {
     let target = resolveLinkedTarget(reader, location.hash);
     if (target) {
+      reader.querySelectorAll('.glr-post--linked').forEach((el) => {
+        if (el === target) return;
+        el.classList.remove('glr-post--linked');
+        el.removeAttribute('data-glr-linked');
+      });
       target.classList.add('glr-post--linked');
       target.setAttribute('data-glr-linked', '1');
     } else {
