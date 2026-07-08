@@ -14,6 +14,7 @@ import {
   markSingleLineBodies,
   enableIconPreviews,
   applyMoieties,
+  watchResize,
 } from '../reader-core/index.js';
 import type { FixtureMeta, ThemeVars } from '../reader-core/index.js';
 
@@ -325,18 +326,7 @@ function render(state: ViewState): void {
 
 // Re-flow icons on resize (debounced) — post heights, and thus how far an icon
 // can grow before meeting the next same-side icon, change with viewport width.
-let resizeTimer: ReturnType<typeof setTimeout> | null = null;
-globalThis.addEventListener?.('resize', () => {
-  if (resizeTimer !== null) clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => {
-    resizeTimer = null;
-    if (currentReader) {
-      layoutIcons(currentReader);
-      // Width changed → re-evaluate which bodies are single-line (wrap/unwrap).
-      markSingleLineBodies(currentReader);
-    }
-  }, 120);
-});
+watchResize(() => currentReader);
 
 function paneHeading(text: string): HTMLElement {
   const h = document.createElement('h2');

@@ -67,11 +67,7 @@ export interface FixtureMeta {
   readonly file: string;
   readonly view: 'flat' | 'paginated';
   readonly postCount: number;
-  readonly distinctAuthors: number;
-  readonly distinctCharacters: number;
   readonly hasIconlessPosts: boolean;
   readonly hasAuthorOnlyPosts: boolean;
-  readonly avgPostChars: number;
-  readonly category: string;
   readonly notes: string;
 }

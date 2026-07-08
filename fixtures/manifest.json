@@ -5,12 +5,8 @@
     "sourceUrl": "https://glowfic.com/posts/54226?view=flat",
     "view": "flat",
     "postCount": 40,
-    "distinctAuthors": 2,
-    "distinctCharacters": 2,
     "hasIconlessPosts": false,
     "hasAuthorOnlyPosts": false,
-    "avgPostChars": 61,
-    "category": "dialogue-2author",
     "notes": "Thread 54226; 2 authors exchanging short replies"
   },
   {
@@ -19,12 +15,8 @@
     "sourceUrl": "https://glowfic.com/posts/60366?view=flat",
     "view": "flat",
     "postCount": 40,
-    "distinctAuthors": 3,
-    "distinctCharacters": 9,
     "hasIconlessPosts": true,
     "hasAuthorOnlyPosts": true,
-    "avgPostChars": 196,
-    "category": "multi-author-3plus",
     "notes": "Thread 60366; 3 distinct authors"
   },
   {
@@ -33,12 +25,8 @@
     "sourceUrl": "https://glowfic.com/posts/54226?per_page=100&page=1",
     "view": "paginated",
     "postCount": 30,
-    "distinctAuthors": 2,
-    "distinctCharacters": 5,
     "hasIconlessPosts": false,
     "hasAuthorOnlyPosts": false,
-    "avgPostChars": 334,
-    "category": "icon-heavy",
     "notes": "Thread 54226; 100% posts have icons; 30 unique icon srcs; paginated view with <a>-wrapped authors"
   },
   {
@@ -47,12 +35,8 @@
     "sourceUrl": "https://glowfic.com/posts/57823?view=flat",
     "view": "flat",
     "postCount": 40,
-    "distinctAuthors": 2,
-    "distinctCharacters": 2,
     "hasIconlessPosts": true,
     "hasAuthorOnlyPosts": true,
-    "avgPostChars": 748,
-    "category": "mixed-iconless",
     "notes": "Thread 57823; 18 iconless posts, 18 author-only (spacer-alt)"
   },
   {
@@ -61,12 +45,8 @@
     "sourceUrl": "https://glowfic.com/posts/57823?view=flat",
     "view": "flat",
     "postCount": 39,
-    "distinctAuthors": 2,
-    "distinctCharacters": 3,
     "hasIconlessPosts": true,
     "hasAuthorOnlyPosts": true,
-    "avgPostChars": 1581,
-    "category": "long-infodump",
     "notes": "Thread 57823; 29 posts >800 chars; avg 1581 chars"
   },
   {
@@ -75,12 +55,8 @@
     "sourceUrl": "https://glowfic.com/posts/1025?view=flat",
     "view": "flat",
     "postCount": 36,
-    "distinctAuthors": 2,
-    "distinctCharacters": 2,
     "hasIconlessPosts": false,
     "hasAuthorOnlyPosts": false,
-    "avgPostChars": 251,
-    "category": "icon-aspect",
     "notes": "Thread 1025; includes NON-SQUARE icons (portrait & landscape, e.g. 75x100, 100x68, 434x517, 778x1027) for aspect-ratio testing"
   },
   {
@@ -89,12 +65,8 @@
     "sourceUrl": "https://glowfic.com/posts/4265?page=40",
     "view": "paginated",
     "postCount": 26,
-    "distinctAuthors": 2,
-    "distinctCharacters": 4,
     "hasIconlessPosts": true,
     "hasAuthorOnlyPosts": false,
-    "avgPostChars": 247,
-    "category": "alts",
     "notes": "Thread 4265 p40; 'Carissa Sevar' (lintamande) alternates screennames to-let-you-in / loves-her-strings — alt re-announcement test; 5 iconless posts"
   },
   {
@@ -103,12 +75,8 @@
     "sourceUrl": "https://glowfic.com/posts/53995?page=5",
     "view": "paginated",
     "postCount": 26,
-    "distinctAuthors": 2,
-    "distinctCharacters": 4,
     "hasIconlessPosts": false,
     "hasAuthorOnlyPosts": false,
-    "avgPostChars": 331,
-    "category": "blank-lines",
     "notes": "Thread 53995 p5; 6 posts carry blank-line spacers (<p>&nbsp;</p>) at the body edges — trim-blank-edges test"
   }
 ]

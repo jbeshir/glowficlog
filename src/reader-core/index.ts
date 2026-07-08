@@ -6,18 +6,17 @@ export { renderReader, computeFullAppearances } from './render.js';
 export { trimBlankEdges, isBlankNode } from './bodytrim.js';
 export type { ThemeVars } from './theme.js';
 export { readThemeFromDocument, applyTheme, withAlpha, isTransparent } from './theme.js';
-export type { IconSizeOpts, SingleLineInput, IconBox } from './layout.js';
 export {
   computeIconSizes,
   fitIconBox,
   layoutIcons,
   markSingleLineBodies,
   isSingleLine,
-  resolveLineHeightPx,
   SINGLE_LINE_FACTOR,
   DEFAULT_ICON_OPTS,
   DEFAULT_ICON_PAD,
 } from './layout.js';
+export { watchResize } from './resize.js';
 export {
   commonAncestor,
   renderedPostContainers,

@@ -168,7 +168,7 @@ export function isSingleLine(input: SingleLineInput): boolean {
  * a unitless multiplier (e.g. `1.25` → multiplier × font-size), and an absolute
  * `px` length. Falls back to 1.2 × font-size when the value is unparseable.
  */
-export function resolveLineHeightPx(style: CSSStyleDeclaration): number {
+function resolveLineHeightPx(style: CSSStyleDeclaration): number {
   const fontSize = Number.parseFloat(style.fontSize) || 16;
   const raw = (style.lineHeight || '').trim();
   if (!raw || raw === 'normal') return fontSize * 1.2;
@@ -249,7 +249,7 @@ export function markSingleLineBodies(root: HTMLElement): void {
  * they decode, so the aspect-correct box replaces the square fallback.
  */
 export function layoutIcons(root: HTMLElement): void {
-  const column = (root.querySelector('.glr-column') as HTMLElement | null) ?? root;
+  const column = root.querySelector<HTMLElement>('.glr-column') ?? root;
 
   // Resolve tunables from CSS vars when a window is available; else defaults.
   let opts = DEFAULT_ICON_OPTS;

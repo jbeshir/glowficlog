@@ -17,6 +17,7 @@ import {
   unmountReader,
   enableIconPreviews,
   applyMoieties,
+  watchResize,
 } from '../reader-core/index.js';
 import type { IconPreviewsHandle } from '../reader-core/index.js';
 import { applyMoietyRings } from './moiety.js';
@@ -29,7 +30,7 @@ import {
   STORAGE_KEYS,
   DEFAULT_OPTIONS,
 } from '../shared/options.js';
-import type { Options } from '../shared/options.js';
+import type { Options, StorageChange } from '../shared/options.js';
 
 // ---- Reader activation / restoration ----
 
@@ -362,21 +363,6 @@ function activate(): void {
   applyLinkedHighlightAndScroll(reader);
 }
 
-// Post heights — and therefore how far an icon may grow before meeting the next
-// same-side icon — change with viewport width, so re-flow icons on resize.
-let resizeTimer: ReturnType<typeof setTimeout> | null = null;
-function onResize(): void {
-  if (resizeTimer !== null) clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => {
-    resizeTimer = null;
-    if (readerEl) {
-      layoutIcons(readerEl);
-      // Width changed → bodies may wrap/unwrap, so re-evaluate single-line state.
-      markSingleLineBodies(readerEl);
-    }
-  }, 120);
-}
-
 function deactivate(): void {
   // Tear down the action-menu listeners before the reader goes away — the
   // document-level ones do NOT vanish with the reader subtree, so this must run.
@@ -438,7 +424,7 @@ function onKeydown(event: KeyboardEvent): void {
   // Alt+G toggles. Ignore when typing into fields.
   if (!event.altKey || event.ctrlKey || event.metaKey) return;
   if (event.key.toLowerCase() !== 'g') return;
-  const target = event.target as HTMLElement | null;
+  const target = event.target instanceof HTMLElement ? event.target : null;
   const tag = target?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
   event.preventDefault();
@@ -446,7 +432,7 @@ function onKeydown(event: KeyboardEvent): void {
 }
 
 /** Apply changes pushed from the options page (or another tab) live. */
-function onStorageChange(changes: Record<string, { newValue?: unknown }>): void {
+function onStorageChange(changes: Record<string, StorageChange>): void {
   if (STORAGE_KEYS.condensed in changes) {
     options = { ...options, condensed: changes[STORAGE_KEYS.condensed].newValue === true };
     // Pure styling — just toggle the class, no rebuild needed.
@@ -486,7 +472,7 @@ async function init(): Promise<void> {
 
   mountControls();
   document.addEventListener('keydown', onKeydown, true);
-  globalThis.addEventListener?.('resize', onResize);
+  watchResize(() => readerEl);
   onOptionsChanged(onStorageChange);
 
   // Restore remembered state (everything OFF by default).

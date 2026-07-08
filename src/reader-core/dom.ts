@@ -81,10 +81,7 @@ export function renderedPostContainers(root: ParentNode): HTMLElement[] {
   // is used rather than `instanceof Element` because `Element` is not a global
   // in the plain-Node test runtime (only on a jsdom window).
   const ELEMENT_NODE = 1;
-  const stop =
-    (root as { nodeType?: number }).nodeType === ELEMENT_NODE
-      ? (root as unknown as Element).parentElement
-      : null;
+  const stop = root.nodeType === ELEMENT_NODE ? root.parentElement : null;
   return Array.from(root.querySelectorAll<HTMLElement>('.post-container')).filter(
     (el) => isRenderedContainer(el, stop),
   );

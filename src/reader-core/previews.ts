@@ -44,6 +44,8 @@ export function enableIconPreviews(root: HTMLElement): IconPreviewsHandle {
   const win = doc?.defaultView ?? null;
   const body = doc?.body ?? null;
   if (!doc || !body) return Object.assign(() => {}, { setSuspended() {} });
+  const d = doc;
+  const b = body;
 
   let preview: HTMLDivElement | null = null;
   let previewImg: HTMLImageElement | null = null;
@@ -55,10 +57,10 @@ export function enableIconPreviews(root: HTMLElement): IconPreviewsHandle {
 
   function ensurePreview(): { wrap: HTMLDivElement; img: HTMLImageElement } {
     if (preview && previewImg) return { wrap: preview, img: previewImg };
-    const wrap = doc!.createElement('div');
+    const wrap = d.createElement('div');
     wrap.className = 'glr-icon-preview';
     wrap.setAttribute('aria-hidden', 'true');
-    const img = doc!.createElement('img');
+    const img = d.createElement('img');
     img.alt = '';
     wrap.appendChild(img);
     // The preview lives outside the reader subtree, so copy the reader's resolved
@@ -70,7 +72,7 @@ export function enableIconPreviews(root: HTMLElement): IconPreviewsHandle {
       if (bg) wrap.style.setProperty('--glr-bg', bg);
       if (shadow) wrap.style.setProperty('--glr-pop-shadow', shadow);
     }
-    body!.appendChild(wrap);
+    b.appendChild(wrap);
     preview = wrap;
     previewImg = img;
     return { wrap, img };

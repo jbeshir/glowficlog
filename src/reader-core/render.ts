@@ -30,12 +30,12 @@ function resolveDocument(options: RenderOptions): Document {
   throw new Error('renderReader: no document available (pass options.document)');
 }
 
-function el(
+function el<K extends keyof HTMLElementTagNameMap>(
   doc: Document,
-  tag: string,
+  tag: K,
   className?: string,
   text?: string,
-): HTMLElement {
+): HTMLElementTagNameMap[K] {
   const node = doc.createElement(tag);
   if (className) node.className = className;
   if (text != null) node.textContent = text;
@@ -143,7 +143,7 @@ function buildArm(
   const box = el(doc, 'div', `${NS}-icon-box`);
 
   if (post.iconUrl) {
-    const img = el(doc, 'img', `${NS}-icon`) as HTMLImageElement;
+    const img = el(doc, 'img', `${NS}-icon`);
     img.src = post.iconUrl;
     img.alt = post.iconKeyword ?? post.character ?? post.author ?? '';
     img.title = title;
@@ -189,7 +189,7 @@ function buildArm(
     menu.hidden = true;
 
     for (const action of post.actions) {
-      const link = el(doc, 'a', `${NS}-action`) as HTMLAnchorElement;
+      const link = el(doc, 'a', `${NS}-action`);
       link.setAttribute('role', 'menuitem');
       link.href = action.href;
       if (action.method != null) link.setAttribute('data-method', action.method);
@@ -197,7 +197,7 @@ function buildArm(
       link.title = action.label;
 
       if (action.iconUrl) {
-        const icon = el(doc, 'img', `${NS}-action-icon`) as HTMLImageElement;
+        const icon = el(doc, 'img', `${NS}-action-icon`);
         icon.src = action.iconUrl;
         icon.alt = '';
         icon.setAttribute('aria-hidden', 'true');
@@ -242,7 +242,7 @@ function buildIdentity(doc: Document, post: Post, isFirst: boolean): HTMLElement
   }
 
   if (post.permalink) {
-    const link = el(doc, 'a', `${NS}-permalink`, '#') as HTMLAnchorElement;
+    const link = el(doc, 'a', `${NS}-permalink`, '#');
     link.href = post.permalink;
     link.title = 'Permalink to this post';
     link.target = '_blank';

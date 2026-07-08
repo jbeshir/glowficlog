@@ -7,6 +7,11 @@
 
 import { applyMoieties } from '../reader-core/index.js';
 
+/** Shape of the `/api/v1/users` lookup response (subset this module relies on). */
+interface MoietyLookupResponse {
+  results?: Array<{ username?: string; moiety?: string | null }>;
+}
+
 const cache = new Map<string, string | null>();
 
 export function clearMoietyCache(): void {
@@ -23,14 +28,13 @@ export function collectAuthors(reader: HTMLElement): string[] {
 }
 
 export async function fetchMoiety(username: string): Promise<string | null> {
-  if (cache.has(username)) return cache.get(username)!;
+  const cached = cache.get(username);
+  if (cached !== undefined) return cached;
   let colour: string | null = null;
   try {
     const resp = await fetch('/api/v1/users?q=' + encodeURIComponent(username) + '&match=exact');
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json() as {
-      results?: Array<{ username?: string; moiety?: string | null }>;
-    };
+    const data = await resp.json() as MoietyLookupResponse;
     const match = data.results?.find(r => r.username === username) ?? data.results?.[0];
     const hex = match?.moiety ?? null;
     colour = hex ? '#' + hex : null;
