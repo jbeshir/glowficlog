@@ -624,8 +624,21 @@
   display: none !important;
 }
 
-/* Floating control cluster (spanner + toggle) injected by the content script. */
+/* Floating control cluster (spanner + toggle) injected by the content script. The
+   cluster is appended to document.body — OUTSIDE .glr-reader — so it cannot
+   inherit the reader's host-sampled palette tokens. It instead carries its OWN
+   control-chrome tokens here (light defaults + the [data-theme="dark"] override
+   below), so the two buttons reference --glr-btn-* design tokens rather than
+   hardcoded colour literals. The content script sets data-theme on the cluster
+   from glowfic's sampled palette, so the buttons follow the host's light/dark —
+   not the OS. */
 .glr-controls {
+  --glr-btn-bg: #2563eb;          /* accent blue (matches the reader's --glr-link light) */
+  --glr-btn-bg-hover: #1d4ed8;    /* darker accent on hover */
+  --glr-btn-on: #047857;          /* success green for the "on"/pressed toggle state */
+  --glr-btn-fg: #ffffff;          /* button label / icon colour */
+  --glr-btn-focus: #ffffff;       /* focus-ring colour */
+
   position: fixed;
   right: 16px;
   bottom: 16px;
@@ -634,6 +647,17 @@
   flex-direction: row;
   align-items: center;
   gap: 8px;
+}
+
+/* Dark-mode control chrome: the content script sets data-theme="dark" on the
+   cluster when glowfic's sampled background is dark, keeping the buttons legible
+   on dark hosts — matching the host theme rather than the OS. */
+.glr-controls[data-theme="dark"] {
+  --glr-btn-bg: #3b5bdb;
+  --glr-btn-bg-hover: #2f49ad;
+  --glr-btn-on: #0a8f6a;
+  --glr-btn-fg: #f5f6f8;
+  --glr-btn-focus: #c7d2fe;
 }
 
 .glr-toggle {
@@ -648,16 +672,16 @@
   padding: 8px 16px;
   border: none;
   border-radius: 999px;
-  background: #2563eb;
-  color: #ffffff;
+  background: var(--glr-btn-bg);
+  color: var(--glr-btn-fg);
   font: 600 13px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 
-.glr-toggle:hover { background: #1d4ed8; }
-.glr-toggle[aria-pressed="true"] { background: #047857; }
-.glr-toggle:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.glr-toggle:hover { background: var(--glr-btn-bg-hover); }
+.glr-toggle[aria-pressed="true"] { background: var(--glr-btn-on); }
+.glr-toggle:focus-visible { outline: 2px solid var(--glr-btn-focus); outline-offset: 2px; }
 
 .glr-spanner {
   display: inline-flex;
@@ -669,16 +693,16 @@
   padding: 0;
   border: none;
   border-radius: 999px;
-  background: #2563eb;
-  color: #fff;
+  background: var(--glr-btn-bg);
+  color: var(--glr-btn-fg);
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 
-.glr-spanner:hover { background: #1d4ed8; }
-.glr-spanner:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.glr-spanner:hover { background: var(--glr-btn-bg-hover); }
+.glr-spanner:focus-visible { outline: 2px solid var(--glr-btn-focus); outline-offset: 2px; }
 /* .glr-spanner sets display:inline-flex (specificity 0,1,0); the UA [hidden]
    rule is also 0,1,0 but UA loses to author, so the element would stay visible
    even when hidden=true. This 0,2,0 rule restores the intended hide behaviour. */

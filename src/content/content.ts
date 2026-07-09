@@ -11,6 +11,7 @@ import {
   renderReader,
   readThemeFromDocument,
   applyTheme,
+  themeMode,
   layoutIcons,
   markSingleLineBodies,
   mountReaderInPostList,
@@ -87,17 +88,6 @@ function revealAfterFouc(): void {
   } catch {
     /* a stray style tag is harmless; never break the host page over it */
   }
-}
-
-function detectTheme(): 'light' | 'dark' {
-  try {
-    if (globalThis.matchMedia?.('(prefers-color-scheme: dark)').matches) {
-      return 'dark';
-    }
-  } catch {
-    /* matchMedia may be unavailable */
-  }
-  return 'light';
 }
 
 /** True for ANY glowfic thread page — including paginated reply pages
@@ -337,17 +327,23 @@ function activate(): void {
   const posts = parsePosts(document);
   if (posts.length === 0) return; // selectors absent → no-op
 
+  // Colours, typography AND light/dark all follow the host glowfic theme (read
+  // BEFORE we hide the originals, while their computed styles are still
+  // observable). Cheap, so re-read on every (re)activation rather than caching.
+  const hostTheme = readThemeFromDocument(document);
+  const mode = themeMode(hostTheme);
   const reader = renderReader(posts, {
     document,
-    theme: detectTheme(),
+    theme: mode,
     trimBlankEdges: options.trimBlankEdges,
   });
   // The super-condensed density mode is a single class on the reader root.
   reader.classList.toggle('glr-condensed', options.condensed);
-  // Colours AND typography follow the host glowfic theme (read BEFORE we hide the
-  // originals, while their computed styles are still observable). Cheap, so
-  // re-read on every (re)activation rather than caching.
-  applyTheme(reader, readThemeFromDocument(document));
+  applyTheme(reader, hostTheme);
+  // The floating controls live on <body>, outside the reader, so they can't
+  // inherit its host-sampled tokens; point them at the same derived mode so the
+  // buttons match glowfic's light/dark rather than the OS.
+  controls?.container.setAttribute('data-theme', mode);
   // Insert the reader at the post list's position — between the top and bottom
   // paginators — and hide only the post containers (paginators stay). Bail out
   // untouched if there are no containers to anchor to.
@@ -424,6 +420,9 @@ function mountControls(): void {
     onOpenOptions: () => openOptionsPage(),
   });
   document.body.appendChild(controls.container);
+  // Theme the cluster from glowfic's own palette so the toggle matches the host
+  // even while the reader is OFF (re-set from a live sample on each activate()).
+  controls.container.setAttribute('data-theme', themeMode(readThemeFromDocument(document)));
   reflectButton();
 }
 
@@ -477,16 +476,18 @@ async function init(): Promise<void> {
     return;
   }
 
-  mountControls();
   document.addEventListener('keydown', onKeydown, true);
   watchResize(() => readerEl);
   onOptionsChanged(onStorageChange);
 
-  // Restore remembered state (everything OFF by default).
+  // Restore remembered state (everything OFF by default) BEFORE mounting the
+  // controls, so the toggle button paints in its correct on/off state on its
+  // first frame instead of flashing the default 'off' label.
   options = await loadOptions();
   // Sync the localStorage mirror to what we just loaded, so it can't go stale
   // between now and the next setEnabled() call (e.g. this tab never toggles).
   mirrorEnabled(options.enabled);
+  mountControls();
   if (options.enabled) {
     activate();
   }
