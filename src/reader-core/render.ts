@@ -91,10 +91,19 @@ function initialFor(post: Post): string {
 
 /**
  * Build the post body node from raw HTML using the injected document. The markup
- * is the glowfic.com page's own already-rendered, same-origin content (or a saved
- * fixture in the dev harness), so the reader re-displays it as-is: re-inserting it
- * runs nothing the page did not already run, and `innerHTML` never executes
- * `<script>`. The only transform is the optional blank-edge trim.
+ * is the glowfic.com page's own server-rendered post content (`.post-content`),
+ * already live in this same-origin document — the browser parsed it, and ran or
+ * didn't run it, at page load, before this content script existed. We re-display
+ * it as-is. Assigning it back via `innerHTML` does not re-execute `<script>` (the
+ * HTML5 inert-script rule), so the re-display adds no execution path of its own.
+ *
+ * This reader is NOT a security boundary for glowfic's content and deliberately
+ * does not try to be one: a content script sits downstream of an origin that has
+ * already rendered the markup, so it cannot reliably sanitise what the page is
+ * already showing, and an allowlist aggressive enough to "secure" arbitrary rich
+ * post HTML would mangle legitimate posts. The boundary that matters is glowfic's
+ * own server-side handling — the same one protecting the page you are looking at.
+ * The only transform here is the optional blank-edge trim.
  */
 function buildBody(doc: Document, bodyHtml: string, trim: boolean): HTMLElement {
   const body = el(doc, 'div', `${NS}-content`);

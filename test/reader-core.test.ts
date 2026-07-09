@@ -253,7 +253,10 @@ test('absence variants: every edge case parses without throwing', () => {
           <div class="post-content"><p>gone</p></div>
         </div>
       </div>
-      <!-- malicious body content must be neutralised on render -->
+      <!-- "hostile"-looking body content: the reader re-displays glowfic's own
+           same-origin markup as-is (it is NOT a sanitiser — see buildBody), so
+           these nodes survive in the output; innerHTML just never executes the
+           <script>. The legitimate formatting alongside them survives too. -->
       <div class="post-container post-reply">
         <a class="noheight" id="reply-205"> </a>
         <div class="padding-10"><div class="post-info-box">
@@ -262,7 +265,7 @@ test('absence variants: every edge case parses without throwing', () => {
             <div class="post-character">Captain</div>
             <div class="post-author">Alice</div>
           </div></div>
-          <div class="post-content"><p onclick="evil()">x</p><script>evil()</script><a href="javascript:evil()">bad</a></div>
+          <div class="post-content"><p onclick="evil()">x</p><script>evil()</script><a href="javascript:evil()">bad</a><em>keepme</em><a href="/safe/path">oklink</a></div>
         </div>
       </div>
     </div>`;
@@ -301,14 +304,35 @@ test('absence variants: every edge case parses without throwing', () => {
   assert.equal(deleted.screenname, null);
   assert.equal(deleted.iconUrl, null);
 
-  // Render must not throw on any of these edge cases (including a post body
-  // carrying a <script>, an inline handler, and a javascript: href — the reader
-  // re-displays glowfic's own same-origin markup as-is and does not sanitise it).
+  // Render must not throw on any of these edge cases. The reader re-displays
+  // glowfic's own same-origin post markup as-is — it is deliberately NOT a
+  // sanitiser (a content script is downstream of the origin that already rendered
+  // and ran this content; glowfic's server-side handling is the boundary). This
+  // test PINS that pass-through policy: a future change that starts stripping
+  // post markup must update these assertions and reckon with the trade-off.
   let reader!: HTMLElement;
   assert.doesNotThrow(() => {
     reader = renderReader(posts, { document: doc });
   });
   assert.equal(reader.querySelectorAll('.glr-post').length, 6);
+
+  // The hostile-looking post is reply-205. Its markup is re-displayed verbatim:
+  const hostile = reader.querySelector('[data-post-id="205"] .glr-content');
+  assert.ok(hostile, 'hostile post body rendered');
+  // Pass-through: the script/handler/javascript: nodes are present in the output
+  // (NOT stripped). The <script> is inert — innerHTML never executes it — which is
+  // what makes re-display safe without sanitising; assigning bodyHtml above did not
+  // throw, so nothing ran on render.
+  assert.ok(hostile.querySelector('script'), '<script> present (inert via innerHTML)');
+  assert.ok(hostile.querySelector('[onclick]'), 'inline on* handler present (as-is)');
+  assert.ok(
+    hostile.querySelector('a[href^="javascript:" i]'),
+    'javascript: href present (as-is, not click-tested)',
+  );
+  // Legitimate formatting in the same body is of course also preserved:
+  const em = hostile.querySelector('em');
+  assert.ok(em && /keepme/.test(em.textContent ?? ''), '<em> preserved');
+  assert.ok(hostile.querySelector('a[href="/safe/path"]'), 'relative link preserved');
 
   // Reader default theme is light.
   assert.equal(reader.getAttribute('data-theme'), 'light');
@@ -609,4 +633,89 @@ test('fixture alts: the alternating-screenname character re-announces each switc
     }
     prevScreen = p.screenname;
   });
+});
+
+// ---------------------------------------------------------------------------
+// Parser edge-case robustness:
+//   (a) a bare `id="reply-"` (prefix, no numeric suffix) must not yield an empty
+//       id — it falls through to the positional `pos-{index}` fallback.
+//   (b) two replies sharing the SAME numeric id still render as two distinct posts
+//       (the renderer keys nothing on id, so there is no collision/crash).
+//   (c) a post container with NO `.post-content` parses without throwing and yields
+//       an empty body.
+// ---------------------------------------------------------------------------
+test('deriveId: a bare id="reply-" with no numeric suffix yields a positional id', () => {
+  // No permalink either, so the id must come from the positional fallback.
+  const html = `
+    <div class="post-list">
+      <div class="post-container post-reply">
+        <a class="noheight" id="reply-"></a>
+        <div class="post-character">Ann</div>
+        <div class="post-author">Auth</div>
+        <div class="post-content"><p>body</p></div>
+      </div>
+    </div>`;
+  const posts = parsePosts(domFor(html).window.document);
+  assert.equal(posts.length, 1);
+  assert.equal(posts[0].id, 'pos-0', 'empty reply- suffix falls through to the positional id');
+  assert.notEqual(posts[0].id, '', 'id is never the empty string');
+});
+
+test('duplicate numeric reply ids still render as two distinct posts', () => {
+  const html = `
+    <div class="post-list">
+      <div class="post-container post-reply">
+        <a class="noheight" id="reply-5"></a>
+        <div class="post-character">Ann</div>
+        <div class="post-author">A</div>
+        <div class="post-content"><p>first</p></div>
+      </div>
+      <div class="post-container post-reply">
+        <a class="noheight" id="reply-5"></a>
+        <div class="post-character">Bob</div>
+        <div class="post-author">B</div>
+        <div class="post-content"><p>second</p></div>
+      </div>
+    </div>`;
+  const doc = domFor(html).window.document;
+  const posts = parsePosts(doc);
+  assert.equal(posts.length, 2);
+  assert.deepEqual(posts.map((p) => p.id), ['5', '5'], 'both posts share the colliding id');
+
+  let reader!: HTMLElement;
+  assert.doesNotThrow(() => {
+    reader = renderReader(posts, { document: doc });
+  }, 'renderReader must not throw on an id collision');
+  const rendered = reader.querySelectorAll('.glr-post');
+  assert.equal(rendered.length, 2, 'two distinct posts rendered despite the id collision');
+  assert.notEqual(rendered[0], rendered[1], 'the two posts are distinct DOM nodes');
+  assert.match(rendered[0].textContent ?? '', /first/);
+  assert.match(rendered[1].textContent ?? '', /second/);
+});
+
+test('a post container with no .post-content parses and renders an empty body', () => {
+  const html = `
+    <div class="post-list">
+      <div class="post-container post-reply">
+        <a class="noheight" id="reply-9"></a>
+        <div class="post-character">Ann</div>
+        <div class="post-author">A</div>
+      </div>
+    </div>`;
+  const doc = domFor(html).window.document;
+
+  let posts: readonly Post[] = [];
+  assert.doesNotThrow(() => {
+    posts = parsePosts(doc);
+  }, 'parsePosts must not throw when .post-content is absent');
+  assert.equal(posts.length, 1);
+  assert.equal(posts[0].bodyHtml, '', 'missing .post-content yields an empty bodyHtml');
+
+  let reader!: HTMLElement;
+  assert.doesNotThrow(() => {
+    reader = renderReader(posts, { document: doc });
+  }, 'renderReader must not throw on an empty body');
+  const content = reader.querySelector('.glr-content');
+  assert.ok(content, 'a content node is still rendered');
+  assert.equal((content.textContent ?? '').trim(), '', 'the rendered body is empty');
 });

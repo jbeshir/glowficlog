@@ -10,6 +10,7 @@ import {
   applyTheme,
   withAlpha,
   isTransparent,
+  themeMode,
 } from '../src/reader-core/index.js';
 import type { ThemeVars } from '../src/reader-core/index.js';
 
@@ -218,4 +219,30 @@ test('readThemeFromDocument + applyTheme round-trip blends a dark host', () => {
   applyTheme(root, readThemeFromDocument(doc));
   assert.equal(root.style.getPropertyValue('--glr-bg'), 'rgb(18, 18, 22)', 'reader bg matches host');
   assert.ok(root.style.getPropertyValue('--glr-muted').includes('0.65'), 'muted derived');
+});
+
+// ---------------------------------------------------------------------------
+// themeMode — light/dark derived from the sampled host background (never the OS)
+// ---------------------------------------------------------------------------
+
+test('themeMode reads dark from a dark host background', () => {
+  assert.equal(themeMode({ bg: 'rgb(18, 18, 22)', fg: '', link: '', border: '' }), 'dark');
+  assert.equal(themeMode({ bg: '#16171b', fg: '', link: '', border: '' }), 'dark');
+});
+
+test('themeMode reads light from a light host background', () => {
+  assert.equal(themeMode({ bg: 'rgb(255, 255, 255)', fg: '', link: '', border: '' }), 'light');
+  assert.equal(themeMode({ bg: '#fffdf7', fg: '', link: '', border: '' }), 'light');
+});
+
+test('themeMode falls back to light when the background is unsampled/unparseable', () => {
+  assert.equal(themeMode({ bg: '', fg: '', link: '', border: '' }), 'light');
+  assert.equal(themeMode({ bg: 'not-a-colour', fg: '', link: '', border: '' }), 'light');
+});
+
+test('themeMode round-trips from a dark host document', () => {
+  const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
+  const doc = dom.window.document;
+  doc.body.style.backgroundColor = 'rgb(20, 20, 24)';
+  assert.equal(themeMode(readThemeFromDocument(doc)), 'dark');
 });
