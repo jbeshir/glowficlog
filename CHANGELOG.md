@@ -1,5 +1,48 @@
 # Changelog
 
+## v0.1.7-alpha — 2026-07-09
+
+### Reader
+
+- **Anchor-tag "linked here" highlight**: reformatting now restores the highlight
+  glowfic.com shows for the post a link points to (or your own next-unread post),
+  redesigned to fit the compact layout and both light/dark themes rather than
+  porting glowfic's plain border directly.
+- **Anchor-tag scroll position**: following a link to a specific reply now scrolls
+  to the correct post after reformatting; previously it could leave the page
+  scrolled to the wrong spot.
+- **Portrait action menu**: restores the link/bookmark/mark-unread icons the
+  compact layout previously dropped, via a menu on tap/click of the character
+  portrait instead of restoring them inline.
+- **Faster, flicker-free reformatting**: the extension now reformats the page
+  before first paint instead of after, removing the brief flash of the original
+  unstyled thread.
+- **Theme follows glowfic, not your OS**: light/dark mode (including the floating
+  toggle/settings buttons) now matches glowfic's own page theme rather than your
+  system preference, so the two can no longer disagree.
+
+### Fixes
+
+- The hover preview and the portrait action menu no longer overlap when both are
+  visible.
+- Fixed the linked-post highlight sometimes marking two posts at once.
+- Fixed the action menu occasionally rendering behind a later post's portrait.
+- Fixed the floating toggle button briefly flashing its "off" state on page load.
+- A malformed reply anchor could previously produce an empty post id; it now
+  falls back safely to a positional id.
+
+### Security
+
+- Scraping for the action-menu links/permalink/post id no longer trusts markup
+  found inside the untrusted, page-author-controlled post body — closes a path
+  where a forged post could spoof a fake action-menu entry or a fake post id.
+
+### Internal
+
+- Consolidated the CSS z-index scheme into a single documented scale, removed
+  several dead/duplicate declarations and unused exports, and other
+  maintainability cleanup — no user-visible change.
+
 ## v0.1.6-alpha — 2026-06-26
 
 ### Reader
