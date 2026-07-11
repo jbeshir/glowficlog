@@ -74,6 +74,15 @@ page.
 
 ---
 
+## Installation
+
+- **Firefox**: [addons.mozilla.org/firefox/addon/glowficlog](https://addons.mozilla.org/en-GB/firefox/addon/glowficlog/)
+- **Chrome / Chromium / Edge**: [chromewebstore.google.com/detail/glowficlog](https://chromewebstore.google.com/detail/glowficlog/mpcnegepfoheepeiogaobijgakpbbgpl)
+
+To load an unpacked build instead (for development), see below.
+
+---
+
 ## Architecture
 
 The renderer is decoupled so the extension and the harness share **one**
