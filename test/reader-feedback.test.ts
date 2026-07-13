@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 
-import { parsePosts, renderReader } from '../src/reader-core/index.js';
+import { parsePosts, renderReader, ACTIONS_MENU_ID } from '../src/reader-core/index.js';
 import type { Post, PostAction } from '../src/reader-core/index.js';
 
 function domFor(html: string): JSDOM {
@@ -218,26 +218,13 @@ test('render: actions menu trigger + menu markup for a post with actions', () =>
   assert.equal(iconBox.getAttribute('role'), 'button');
   assert.equal(iconBox.getAttribute('aria-haspopup'), 'menu');
   assert.equal(iconBox.getAttribute('aria-expanded'), 'false');
-  assert.equal(iconBox.getAttribute('aria-controls'), 'glr-actions-9');
+  assert.equal(iconBox.getAttribute('tabindex'), '0');
+  assert.equal(iconBox.getAttribute('aria-controls'), ACTIONS_MENU_ID);
 
-  const menu = reader.querySelector('#glr-actions-9')!;
-  assert.ok(menu, 'menu element exists');
-  assert.equal(menu.getAttribute('role'), 'menu');
-  assert.ok(menu.hasAttribute('hidden'));
-
-  const items = Array.from(menu.querySelectorAll('.glr-action'));
-  assert.equal(items.length, 2);
-
-  const [item1, item2] = items;
-  assert.equal(item1.getAttribute('role'), 'menuitem');
-  assert.equal(item1.getAttribute('href'), '/replies/9/unread=1');
-  assert.equal(item1.querySelector('.glr-action-label')?.textContent, 'Mark Unread');
-  assert.ok(item1.querySelector('.glr-action-icon'), 'icon present when iconUrl is set');
-
-  assert.equal(item2.getAttribute('role'), 'menuitem');
-  assert.equal(item2.getAttribute('href'), '/replies/9#reply-9');
-  assert.equal(item2.querySelector('.glr-action-label')?.textContent, 'Permalink');
-  assert.equal(item2.querySelector('.glr-action-icon'), null, 'no icon when iconUrl is absent');
+  // The popover itself is a single body-level element built lazily by
+  // enableActionMenu() — render.ts no longer creates a per-post menu node.
+  assert.equal(reader.querySelector('.glr-actions'), null, 'no nested menu element');
+  assert.equal(reader.querySelector(`#${ACTIONS_MENU_ID}`), null, 'no per-post id element');
 });
 
 test('render: no actions -> no menu trigger, no menu element', () => {

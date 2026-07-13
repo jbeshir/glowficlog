@@ -17,6 +17,7 @@ import {
   mountReaderInPostList,
   unmountReader,
   enableIconPreviews,
+  enableActionMenu,
   applyMoieties,
   watchResize,
 } from '../reader-core/index.js';
@@ -168,160 +169,6 @@ function applyLinkedHighlightAndScroll(reader: HTMLElement): void {
   }
 }
 
-// ---- Action-menu interaction wiring ----
-//
-// render.ts emits the trigger (`.glr-icon-box--menu`, ARIA-only, `aria-expanded`
-// permanently "false") and its menu (`.glr-actions`, permanently `hidden`) as
-// static markup — actually opening/closing them is this module's job. The trigger
-// and its menu are always siblings inside the same `.glr-arm` (box appended, then
-// menu — see buildArm), so we navigate between them via sibling links rather than
-// re-deriving a CSS selector from `aria-controls`/id (sidestepping any need for
-// `CSS.escape` there); `document.getElementById` is used only as a defensive
-// fallback if that structural assumption ever breaks.
-
-/** Suspend the hover preview while a menu is open (they'd otherwise overlap —
- *  the popover sits right where the preview appears), resume once none are. */
-function syncPreviewSuspension(reader: HTMLElement): void {
-  try {
-    const anyMenuOpen = reader.querySelector('.glr-actions:not([hidden])') !== null;
-    disablePreviews?.setSuspended(anyMenuOpen);
-  } catch {
-    /* defensive */
-  }
-}
-
-/** Hide every open menu in `reader` and reset its trigger's `aria-expanded`. */
-function closeAllMenus(reader: HTMLElement): void {
-  try {
-    reader.querySelectorAll('.glr-actions:not([hidden])').forEach((menu) => {
-      if (!(menu instanceof HTMLElement)) return;
-      menu.hidden = true;
-      menu.classList.remove('glr-actions--open');
-      menu.parentElement?.classList.remove('glr-arm--menu-open');
-      const trigger = menu.previousElementSibling;
-      if (trigger instanceof HTMLElement && trigger.classList.contains('glr-icon-box--menu')) {
-        trigger.setAttribute('aria-expanded', 'false');
-      }
-    });
-  } catch {
-    /* defensive: a menu stuck open is harmless, never worth breaking the page */
-  }
-  syncPreviewSuspension(reader);
-}
-
-/** Find the menu a trigger controls (structural sibling lookup, id as fallback). */
-function findMenuForTrigger(reader: HTMLElement, trigger: HTMLElement): HTMLElement | null {
-  const sibling = trigger.nextElementSibling;
-  if (sibling instanceof HTMLElement && sibling.classList.contains('glr-actions')) {
-    return sibling;
-  }
-  const id = trigger.getAttribute('aria-controls');
-  if (!id) return null;
-  const byId = document.getElementById(id);
-  return byId instanceof HTMLElement && reader.contains(byId) ? byId : null;
-}
-
-function setMenuOpen(trigger: HTMLElement, menu: HTMLElement, open: boolean): void {
-  menu.hidden = !open;
-  menu.classList.toggle('glr-actions--open', open);
-  trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
-  // The arm is its own stacking context (position:absolute + z-index in CSS),
-  // so the menu's own z-index can't outrank a LATER post's arm on its own —
-  // bump the whole arm above every other arm while its menu is open.
-  trigger.parentElement?.classList.toggle('glr-arm--menu-open', open);
-}
-
-/** Close whatever else is open, then toggle this trigger's own menu. */
-function toggleMenu(reader: HTMLElement, trigger: HTMLElement): void {
-  const menu = findMenuForTrigger(reader, trigger);
-  if (!menu) return;
-  const wasOpen = !menu.hidden;
-  closeAllMenus(reader);
-  if (!wasOpen) setMenuOpen(trigger, menu, true);
-  syncPreviewSuspension(reader);
-}
-
-/** Wire action-menu open/close interaction for one reader instance. Mirrors the
- *  `disablePreviews` disposer pattern: returns a teardown that removes every
- *  listener it added, including the document-level ones (which — unlike the
- *  reader-root listeners — do NOT vanish when the reader subtree is unmounted, so
- *  deactivate() MUST call the returned disposer). Never throws from a handler. */
-function setupMenuInteractions(reader: HTMLElement): () => void {
-  const onClick = (event: MouseEvent): void => {
-    try {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      const trigger = target.closest('.glr-icon-box--menu');
-      if (!(trigger instanceof HTMLElement) || !reader.contains(trigger)) return;
-      toggleMenu(reader, trigger);
-    } catch {
-      /* defensive: never break host page click handling */
-    }
-  };
-
-  const onKeydown = (event: KeyboardEvent): void => {
-    try {
-      if (event.key === 'Escape') {
-        const openMenu = reader.querySelector('.glr-actions:not([hidden])');
-        const trigger =
-          openMenu instanceof HTMLElement ? openMenu.previousElementSibling : null;
-        closeAllMenus(reader);
-        if (trigger instanceof HTMLElement) trigger.focus();
-        return;
-      }
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      const trigger = target.closest('.glr-icon-box--menu');
-      if (!(trigger instanceof HTMLElement) || !reader.contains(trigger)) return;
-      if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
-        // Space would otherwise scroll the page.
-        event.preventDefault();
-        toggleMenu(reader, trigger);
-      }
-    } catch {
-      /* defensive: never break host page keyboard handling */
-    }
-  };
-
-  // Outside-interaction close: a pointerdown anywhere that's not inside the arm
-  // holding an open menu (i.e. not inside that menu OR its trigger) closes it.
-  const onDocumentPointerDown = (event: PointerEvent): void => {
-    try {
-      const target = event.target;
-      if (!(target instanceof Node)) return;
-      const openMenus = Array.from(reader.querySelectorAll('.glr-actions:not([hidden])'));
-      const insideAnOpenOne = openMenus.some((menu) => menu.parentElement?.contains(target));
-      if (!insideAnOpenOne) closeAllMenus(reader);
-    } catch {
-      /* defensive */
-    }
-  };
-
-  // The popover is absolutely positioned, so any scroll would leave it drifted
-  // relative to its trigger — simplest correct behaviour is to just close it.
-  const onDocumentScroll = (): void => {
-    try {
-      closeAllMenus(reader);
-    } catch {
-      /* defensive */
-    }
-  };
-
-  reader.addEventListener('click', onClick);
-  reader.addEventListener('keydown', onKeydown);
-  document.addEventListener('pointerdown', onDocumentPointerDown);
-  document.addEventListener('scroll', onDocumentScroll, { capture: true, passive: true });
-
-  return (): void => {
-    // The reader-root listeners vanish with the subtree on unmount regardless,
-    // but removing them explicitly is cheap and avoids relying on that.
-    reader.removeEventListener('click', onClick);
-    reader.removeEventListener('keydown', onKeydown);
-    document.removeEventListener('pointerdown', onDocumentPointerDown);
-    document.removeEventListener('scroll', onDocumentScroll, { capture: true });
-  };
-}
-
 function activate(): void {
   if (readerEl) return;
   const posts = parsePosts(document);
@@ -360,7 +207,9 @@ function activate(): void {
   // block the initial render.
   if (options.moietyRings) void applyMoietyRings(reader);
   // Wire action-menu open/close; torn down in deactivate().
-  disposeMenus = setupMenuInteractions(reader);
+  disposeMenus = enableActionMenu(reader, posts, {
+    onOpenChange: (open) => disablePreviews?.setSuspended(open),
+  });
   // Mark + scroll to whatever post the page landed on. Last, since it
   // reads icon layout that must already be settled.
   applyLinkedHighlightAndScroll(reader);

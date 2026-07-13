@@ -19,6 +19,7 @@
 
 import type { Post, RenderOptions } from './types.js';
 import { trimBlankEdges } from './bodytrim.js';
+import { ACTIONS_MENU_ID } from './actions.js';
 
 const NS = 'glr';
 
@@ -174,50 +175,22 @@ function buildArm(
 
   arm.appendChild(box);
 
-  // Portrait action menu: only when the post scraped edit-box actions
-  // (mark unread here, bookmark, etc — `.post-edit-box` links). The trigger
-  // attributes on the icon box and the menu markup below are static/ARIA-only;
+  // Portrait action-menu trigger: only when the post scraped edit-box actions
+  // (mark unread here, bookmark, etc — `.post-edit-box` links). The popover
+  // itself is a single body-level element managed by enableActionMenu() — not
+  // a per-post node — so it doesn't bloat the markup or get clipped by an
+  // ancestor's overflow; these trigger attributes are static/ARIA-only,
   // renderReader stays pure, so the actual open/close toggling of
-  // aria-expanded/hidden is wired by the content script.
+  // aria-expanded and the popover's own visibility is wired by the content
+  // script (via enableActionMenu).
   if (post.actions.length > 0) {
-    const menuId = `${NS}-actions-${post.id}`;
-
     box.classList.add(`${NS}-icon-box--menu`);
     box.setAttribute('role', 'button');
     box.setAttribute('tabindex', '0');
     box.setAttribute('aria-haspopup', 'menu');
     box.setAttribute('aria-expanded', 'false');
-    box.setAttribute('aria-controls', menuId);
+    box.setAttribute('aria-controls', ACTIONS_MENU_ID);
     box.title = 'Post actions';
-
-    const menu = el(doc, 'div', `${NS}-actions`);
-    menu.id = menuId;
-    menu.setAttribute('role', 'menu');
-    // Present from the start: the menu is closed until the content script's
-    // toggle handler reveals it, so the very first paint must already match.
-    menu.hidden = true;
-
-    for (const action of post.actions) {
-      const link = el(doc, 'a', `${NS}-action`);
-      link.setAttribute('role', 'menuitem');
-      link.href = action.href;
-      if (action.method != null) link.setAttribute('data-method', action.method);
-      if (action.rel != null) link.rel = action.rel;
-      link.title = action.label;
-
-      if (action.iconUrl) {
-        const icon = el(doc, 'img', `${NS}-action-icon`);
-        icon.src = action.iconUrl;
-        icon.alt = '';
-        icon.setAttribute('aria-hidden', 'true');
-        link.appendChild(icon);
-      }
-      link.appendChild(el(doc, 'span', `${NS}-action-label`, action.label));
-
-      menu.appendChild(link);
-    }
-
-    arm.appendChild(menu);
   }
 
   return arm;
@@ -250,14 +223,6 @@ function buildIdentity(doc: Document, post: Post, isFirst: boolean): HTMLElement
     id.appendChild(chip);
   }
 
-  if (post.permalink) {
-    const link = el(doc, 'a', `${NS}-permalink`, '#');
-    link.href = post.permalink;
-    link.title = 'Permalink to this post';
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    id.appendChild(link);
-  }
   return id;
 }
 

@@ -26,4 +26,6 @@ export {
 } from './dom.js';
 export type { IconPreviewsHandle } from './previews.js';
 export { enableIconPreviews } from './previews.js';
+export type { ActionMenuHandle } from './actions.js';
+export { enableActionMenu, ACTIONS_MENU_ID } from './actions.js';
 export { applyMoieties } from './moiety.js';
