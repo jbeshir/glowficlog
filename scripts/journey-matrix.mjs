@@ -231,35 +231,9 @@ async function checkIconPreview(page, factor) {
   return pass();
 }
 
-/** 3. permalink: .glr-permalink discoverability (hover on pointer, always-on at mobile). */
-async function checkPermalink(page, factor) {
-  const link = (await page.$$('.glr-permalink'))[0];
-  if (!link) return fail('a', 'no .glr-permalink found');
-  await link.scrollIntoViewIfNeeded();
-  const bbox = await link.boundingBox();
-  if (!bbox || bbox.width === 0 || bbox.height === 0) return fail('a', 'permalink has a zero-size bounding box');
-
-  if (factor.isMobile) {
-    const opacity = await link.evaluate((el) => parseFloat(getComputedStyle(el).opacity));
-    if (!(opacity > 0)) return fail('c', `mobile permalink opacity is ${opacity}, expected >0 by default`);
-    return pass();
-  }
-
-  const postHandle = await link.evaluateHandle((el) => el.closest('.glr-post'));
-  const postEl = postHandle.asElement();
-  if (postEl) await postEl.hover();
-  else await link.hover();
-  const opacity = await link.evaluate((el) => parseFloat(getComputedStyle(el).opacity));
-  await page.mouse.move(0, 0);
-  if (!(opacity > 0)) return fail('c', `hovering .glr-post did not raise permalink opacity (got ${opacity})`);
-
-  return pass();
-}
-
 const FEATURE_CHECKS = [
   ['action-menu', checkActionMenu],
   ['icon-preview', checkIconPreview],
-  ['permalink', checkPermalink],
 ];
 
 async function resetState(page) {

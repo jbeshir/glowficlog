@@ -223,14 +223,6 @@ function buildIdentity(doc: Document, post: Post, isFirst: boolean): HTMLElement
     id.appendChild(chip);
   }
 
-  if (post.permalink) {
-    const link = el(doc, 'a', `${NS}-permalink`, '#');
-    link.href = post.permalink;
-    link.title = 'Permalink to this post';
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    id.appendChild(link);
-  }
   return id;
 }
 

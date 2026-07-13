@@ -533,27 +533,6 @@
   letter-spacing: 0.01em;
 }
 
-.glr-permalink {
-  color: var(--glr-muted);
-  text-decoration: none;
-  font-size: 0.8em;
-  opacity: 0;
-  transition: opacity 0.12s ease;
-}
-
-.glr-post:hover .glr-permalink {
-  opacity: 0.7;
-}
-
-.glr-post:focus-within .glr-permalink {
-  opacity: 0.7;
-}
-
-.glr-permalink:hover {
-  opacity: 1;
-  color: var(--glr-link);
-}
-
 /* Body typography: full foreground colour and the host-sampled
    font/size/leading. There is NO inner measure cap — the text fills the post
    card's content box edge-to-edge (inset only by the card's --glr-post-pad), so
@@ -758,14 +737,9 @@
   }
 
   /* display:block drops the flex gap, so restore the 6px spacing between the
-     inline name / screenname / author / permalink spans. */
+     inline name / screenname / author spans. */
   .glr-identity > * + * {
     margin-left: 6px;
-  }
-
-  /* Touch has no hover — always reveal the permalink at mobile. */
-  .glr-permalink {
-    opacity: 0.7;
   }
 
   /* Body text stays left-aligned so it wraps cleanly to the LEFT of the floated
