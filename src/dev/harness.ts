@@ -13,10 +13,16 @@ import {
   layoutIcons,
   markSingleLineBodies,
   enableIconPreviews,
+  enableActionMenu,
   applyMoieties,
   watchResize,
 } from '../reader-core/index.js';
-import type { FixtureMeta, ThemeVars } from '../reader-core/index.js';
+import type {
+  FixtureMeta,
+  ThemeVars,
+  IconPreviewsHandle,
+  ActionMenuHandle,
+} from '../reader-core/index.js';
 
 // Offline stand-in for the live /api/v1/users moiety lookup (no network in the harness).
 function stubMoiety(author: string): string {
@@ -226,7 +232,9 @@ function labelled(text: string, control: HTMLElement): HTMLElement {
 /** The reader currently on screen, so the resize handler can re-flow its icons. */
 let currentReader: HTMLElement | null = null;
 /** Cleanup for the on-screen reader's icon previews; torn down on re-render. */
-let disablePreviews: (() => void) | null = null;
+let disablePreviews: IconPreviewsHandle | null = null;
+/** Cleanup for the on-screen reader's action menu; torn down on re-render. */
+let disableMenus: ActionMenuHandle | null = null;
 
 function render(state: ViewState): void {
   writeState(state);
@@ -239,7 +247,11 @@ function render(state: ViewState): void {
   document.body.style.background = palette.vars.bg;
   document.body.style.color = palette.vars.fg;
 
-  // Tear down the previous reader's previews before we rebuild the DOM.
+  // Tear down the previous reader's menu and previews before we rebuild the DOM.
+  if (disableMenus) {
+    disableMenus();
+    disableMenus = null;
+  }
   if (disablePreviews) {
     disablePreviews();
     disablePreviews = null;
@@ -322,6 +334,10 @@ function render(state: ViewState): void {
   }
   // Smooth floating icon previews, same code path as the extension.
   disablePreviews = enableIconPreviews(reader);
+  // Action menu, same code path as the extension.
+  disableMenus = enableActionMenu(reader, posts, {
+    onOpenChange: (open) => disablePreviews?.setSuspended(open),
+  });
 }
 
 // Re-flow icons on resize (debounced) — post heights, and thus how far an icon

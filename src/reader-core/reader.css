@@ -13,50 +13,42 @@
 
 /*
  * z-index scale (--glr-z-*). The reader uses exactly these tiers; every
- * z-index in this file is one of them (the lone exception is the mobile
- * `.glr-arm { z-index: auto }` RESET, which is not a tier). Consolidated here
- * so the stacking order is documented in ONE place instead of as six ad-hoc
- * magic numbers scattered through the file.
+ * z-index in this file is one of them. Consolidated here so the stacking
+ * order is documented in ONE place instead of as ad-hoc magic numbers
+ * scattered through the file.
  *
- * Defined at :root, NOT on .glr-reader, on purpose: two consumers
- * (.glr-icon-preview and .glr-controls) are appended directly to <body>,
- * OUTSIDE the .glr-reader subtree (see previews.ts / content.ts). CSS custom
- * properties inherit down the DOM tree from where they are set, not from the
- * CSS source — a property set only on .glr-reader would be invisible to those
- * two elements, their var() would be invalid, and z-index would silently fall
- * back to `auto` (a real stacking regression). :root is inherited by every
- * consumer regardless of where it is mounted, and there is no shadow DOM in
- * play, so :root is the real <html>.
+ * Defined at :root, NOT on .glr-reader, on purpose: the three body-level
+ * popups (.glr-icon-preview, .glr-controls, .glr-actions) are appended
+ * directly to <body>, OUTSIDE the .glr-reader subtree (see previews.ts /
+ * content.ts). CSS custom properties inherit down the DOM tree from where
+ * they are set, not from the CSS source — a property set only on .glr-reader
+ * would be invisible to those elements, their var() would be invalid, and
+ * z-index would silently fall back to `auto` (a real stacking regression).
+ * :root is inherited by every consumer regardless of where it is mounted,
+ * and there is no shadow DOM in play, so :root is the real <html>.
  *
  * Tiers, low to high:
  *   base        (0)           decorative fills behind the post text — the band
  *                             and the connector.
  *   body        (1)           the post's own text, painting above its band.
  *   arm         (2)           the icon arm's shared per-post tier.
- *   arm-active  (2147483645)  lifts a WHOLE arm above every sibling arm while
- *                             its menu is open (.glr-arm--menu-open). Ranks the
- *                             arm's own box at the shared root-level context.
- *   menu        (2147483645)  the action-menu popover itself (.glr-actions), a
- *                             child of .glr-arm. Because .glr-arm establishes
- *                             its own stacking context, this value only ranks
- *                             the menu among THAT arm's children — it never
- *                             competes with other arms. A distinct token from
- *                             arm-active (same value today, unrelated purpose)
- *                             so the two can move independently later.
- *   overlay     (2147483646)  topmost tier, SHARED by .glr-icon-preview and
- *                             .glr-controls. These two DO compete in one real
- *                             context (both position:fixed on <body>); their
- *                             tie is broken by DOM insertion order (the preview
- *                             is created lazily on first hover, always after the
- *                             controls, so it paints on top). ONE shared token
- *                             so that ordering invariant can't silently drift.
+ *   overlay     (2147483646)  ONE shared topmost tier for the THREE
+ *                             body-level fixed popups: .glr-icon-preview,
+ *                             .glr-controls, .glr-actions. All three are
+ *                             position:fixed children of <body>, so they
+ *                             compete in one real stacking context; ties are
+ *                             broken by DOM insertion order. `.glr-controls`
+ *                             is appended first (at mountControls()), while
+ *                             `.glr-icon-preview` and `.glr-actions` are
+ *                             created lazily (first hover / first menu-open)
+ *                             so they insert later and paint above controls.
+ *                             The preview and the menu mutually suspend, so
+ *                             they are never both visible at once.
  */
 :root {
   --glr-z-base: 0;
   --glr-z-body: 1;
   --glr-z-arm: 2;
-  --glr-z-arm-active: 2147483645;
-  --glr-z-menu: 2147483645;
   --glr-z-overlay: 2147483646;
 }
 
@@ -309,16 +301,6 @@
 .glr-post--left .glr-arm { right: calc(100% - var(--glr-gutter)); }
 .glr-post--right .glr-arm { left: calc(100% - var(--glr-gutter)); }
 
-/* Every arm sits at the same z-index:2, so without this a LATER post's arm
-   (later in DOM, same tier) paints over an EARLIER post's open action menu —
-   the menu's own huge z-index only ranks it among ITS OWN arm's children (see
-   the `.glr-actions` note above). Toggled by the content script alongside
-   `glr-actions--open`/`aria-expanded` so the whole arm briefly outranks every
-   other arm while its menu is open, then drops back to the shared tier. */
-.glr-arm--menu-open {
-  z-index: var(--glr-z-arm-active);
-}
-
 /*
  * Icon box: the square picture/monogram inside the padded arm. layoutIcons
  * writes its width/height (cap-primary, shrinking only to avoid same-side
@@ -402,25 +384,17 @@
 
 /*
  * Portrait action menu: a small popover of post actions (mark unread
- * here, bookmark, etc — scraped from glowfic's `.post-edit-box`), appended
- * inside `.glr-arm` right after `.glr-icon-box` and triggered from it (the
- * `.glr-icon-box--menu` role="button"). It is `position: absolute` against the
- * arm (its positioned ancestor on desktop — see the mobile override below,
- * where the arm goes static), themed from the same vars as the rest of the
- * reader, and sits just under the icon-preview/controls layer (2147483646).
- * The content script toggles both the `hidden` attribute and a
- * `glr-actions--open` class; either is enough to reveal the menu here.
+ * here, bookmark, etc — scraped from glowfic's `.post-edit-box`), triggered
+ * from the `.glr-icon-box--menu` role="button". A SINGLE body-level popover
+ * positioned by JS off the trigger's rect, mirroring `.glr-icon-preview`,
+ * themed from the same copied vars. The content script toggles the
+ * `glr-actions--open` class to reveal the menu.
  */
 .glr-actions {
-  /* NOTE: on desktop, `.glr-arm` is itself `position:absolute` with an explicit
-     z-index (below), so it establishes its OWN stacking context — this menu's
-     huge z-index only ranks it among that arm's own children, not against other
-     posts' arms. See `.glr-arm--menu-open` for the fix (mobile is unaffected:
-     the arm goes static there, so it doesn't trap the menu's z-index). */
-  position: absolute;
-  top: 100%;
-  margin-top: 6px;
-  z-index: var(--glr-z-menu);
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: var(--glr-z-overlay);
   min-width: 180px;
   padding: 4px;
   border-radius: var(--glr-radius);
@@ -433,12 +407,7 @@
   pointer-events: none;
   transition: opacity 0.12s ease, transform 0.12s ease;
 }
-/* Open toward the text column rather than off the viewport edge. */
-.glr-arm--left .glr-actions { left: 0; }
-.glr-arm--right .glr-actions { right: 0; }
 
-.glr-actions[hidden] { display: none; }
-.glr-actions:not([hidden]),
 .glr-actions.glr-actions--open {
   opacity: 1;
   transform: none;
@@ -573,6 +542,10 @@
 }
 
 .glr-post:hover .glr-permalink {
+  opacity: 0.7;
+}
+
+.glr-post:focus-within .glr-permalink {
   opacity: 0.7;
 }
 
@@ -749,9 +722,20 @@
 
   /* Body becomes a full-width flow block (grid-column:2 is now inert). Keep its
      internal padding; it must NOT establish a BFC, so text wraps around the
-     floated icon. */
+     floated icon.
+     Desktop's position:relative + z-index:1 (to paint over .glr-band) is NOT
+     harmless here: .glr-band is display:none on mobile, so that z-index no
+     longer has anything to paint over, but it still makes .glr-body a
+     "positioned descendant", which — per CSS's painting order — stacks ABOVE
+     .glr-arm's now-unpositioned float (mobile resets the arm to
+     position:static so it can float and let text wrap around it). The result
+     is .glr-body's invisible box sitting on top of the icon, silently
+     swallowing every tap before it reaches .glr-icon-box--menu. Resetting
+     back to position:static drops .glr-body into the plain in-flow layer,
+     which paints BELOW floats, restoring the icon as the topmost hit target. */
   .glr-body {
-    /* position:relative from desktop is harmless and kept; no override needed. */
+    position: static;
+    z-index: auto;
     padding: var(--glr-post-pad-y) var(--glr-post-pad);
   }
 
@@ -777,6 +761,11 @@
      inline name / screenname / author / permalink spans. */
   .glr-identity > * + * {
     margin-left: 6px;
+  }
+
+  /* Touch has no hover — always reveal the permalink at mobile. */
+  .glr-permalink {
+    opacity: 0.7;
   }
 
   /* Body text stays left-aligned so it wraps cleanly to the LEFT of the floated
@@ -822,19 +811,6 @@
     box-shadow:
       inset 3px 0 0 0 var(--glr-chip-bg),
       inset 4px 0 0 0 var(--glr-linked);
-  }
-
-  /* Actions popover, mobile: .glr-arm is float:right/position:static
-     here, so it no longer anchors the popover — .glr-post (still position:relative)
-     becomes the effective positioned ancestor. Re-anchor to the post's top-right
-     corner, offset below the (now-floated) icon box's own rendered height. Equal
-     specificity to the desktop `.glr-arm--left/--right .glr-actions` rules, and
-     this block comes later in the file, so it wins regardless of post side. */
-  .glr-arm--left .glr-actions,
-  .glr-arm--right .glr-actions {
-    top: calc(var(--glr-icon-min) + (var(--glr-icon-pad) * 2) + 8px);
-    left: auto;
-    right: 0;
   }
 
   /* Keep the control cluster reachable on narrow screens; two 44px buttons +

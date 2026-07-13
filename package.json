@@ -12,7 +12,8 @@
     "test": "tsx --test test/*.test.ts",
     "build": "node scripts/build.mjs",
     "dev": "node scripts/build.mjs --dev",
-    "validate": "npm run typecheck && npm run lint && npm run test && npm run build && npm run lint:ext",
+    "test:e2e": "node scripts/journey-matrix.mjs",
+    "validate": "npm run typecheck && npm run lint && npm run test && npm run build && npm run test:e2e && npm run lint:ext",
     "package": "node scripts/package.mjs"
   },
   "devDependencies": {
@@ -21,6 +22,7 @@
     "esbuild": "^0.24.2",
     "eslint": "^9.18.0",
     "jsdom": "^25.0.1",
+    "playwright-core": "^1.61.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0",
