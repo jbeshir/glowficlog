@@ -1,6 +1,6 @@
 {
   "name": "glowficlog",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "license": "MIT",
   "description": "Browser extension that reformats glowfic.com threads into a compact, high-information-density reader view, plus an offline dev harness sharing the same renderer.",
   "private": true,

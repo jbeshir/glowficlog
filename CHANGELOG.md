@@ -1,5 +1,43 @@
 # Changelog
 
+## v0.1.8-alpha — 2026-07-14
+
+### Fixes
+
+- **Action-menu icon unresponsive on mobile**: tapping a post's portrait to
+  open the link/bookmark/unread menu silently did nothing below the 640px
+  breakpoint. A sibling element (the post body) kept a stacking property from
+  the desktop layout that no longer had anything to paint over once mobile
+  layout hid the element it was meant to sit above — it ended up covering the
+  icon's tap target instead.
+- **Extension failed to load in Firefox**: the manifest's
+  `web_accessible_resources` used a Chrome-only MV3 property
+  (`use_dynamic_url`) that Firefox's schema rejects. Removed it; Chrome's
+  behaviour is unaffected since the resource (`options.html`) was already
+  scoped to `glowfic.com` via `matches`.
+
+### Reader
+
+- **Removed the standalone permalink link**: the action menu already offers
+  the same link as a "Permalink" item, so the separate hover/focus-revealed
+  link next to the post identity was showing it a second time. Reach it via
+  the action menu instead.
+
+### Internal
+
+- The action-menu popover is now a single lazily-created, body-level overlay
+  positioned by script off the trigger's on-screen position — the same
+  pattern already used for the icon hover-preview and the floating
+  toggle/settings buttons — rather than living nested inside the post's icon
+  box, which is what made it fragile to the mobile layout change above. The
+  CSS z-index scale is documented and simplified to match.
+- New browser-driven test (`npm run test:e2e`, part of `npm run validate`)
+  drives a real Chromium across five viewport widths — including just above
+  and below the 640px breakpoint — checking that every interactive element is
+  present, actually receives clicks/taps (not silently covered by another
+  element), and behaves as expected. This is the class of bug jsdom's
+  unit tests cannot see, and the one that caused the mobile tap bug above.
+
 ## v0.1.7-alpha — 2026-07-09
 
 ### Reader
